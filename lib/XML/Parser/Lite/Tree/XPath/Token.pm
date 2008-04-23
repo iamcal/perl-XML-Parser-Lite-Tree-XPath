@@ -2,6 +2,7 @@ package XML::Parser::Lite::Tree::XPath::Token;
 
 use strict;
 use XML::Parser::Lite::Tree::XPath::Result;
+use XML::Parser::Lite::Tree::XPath::Axis;
 use Data::Dumper;
 
 sub new {
@@ -18,6 +19,18 @@ sub match {
 	return 0 if (defined($content) && ($self->{content} ne $content));
 
 	return 1;
+}
+
+sub is_expression {
+	my ($self) = @_;
+
+	return 1 if $self->{type} eq 'Number';
+	return 1 if $self->{type} eq 'Literal';
+	return 0 if $self->{type} eq 'Operator';
+
+	warn "Not sure if $self->{type} is an expression";
+
+	return 0;
 }
 
 sub dump {
@@ -37,9 +50,10 @@ sub ret {
 }
 
 sub eval {
-	my ($self, $input) = @_;
+	my ($self, $context) = @_;
 
-	return $input if $input->is_error;
+	return $context if $context->is_error;
+	$self->{context} = $context;
 
 	if ($self->{type} eq 'LocationPath'){
 
@@ -50,8 +64,8 @@ sub eval {
 		if ($self->{absolute}){
 			$ret = $self->{root};
 		}else{
-			#die "relative path";
-			$ret = $input->get_nodeset;
+			$ret = $context->get_nodeset;
+			return $ret if $ret->is_error;
 		}
 
 
@@ -74,8 +88,10 @@ sub eval {
 
 		# for a step, loop through it's children
 
-		my $axis = defined($self->{axis}) ? $self->{axis} : 'child';
-		my $ret = $self->filter_axis($axis, $input);
+		# my $axis = defined($self->{axis}) ? $self->{axis} : 'child';
+		# my $ret = $self->filter_axis($axis, $context);
+
+		my $ret = XML::Parser::Lite::Tree::XPath::Axis::instance->filter($self, $context);
 
 		for my $step(@{$self->{tokens}}){
 
@@ -94,16 +110,16 @@ sub eval {
 
 	}elsif ($self->{type} eq 'NameTest'){
 
-		return $input if $self->{content} eq '*';
+		return $context if $self->{content} eq '*';
 
 		if ($self->{content} =~ m!\:\*$!){
 			return $self->ret('Error', "Can't do NCName:* NameTests");
 		}
 
-		if ($input->{type} eq 'nodeset'){
+		if ($context->{type} eq 'nodeset'){
 			my $out = $self->ret('nodeset', []);
 
-			for my $tag(@{$input->{value}}){
+			for my $tag(@{$context->{value}}){
 				if (($tag->{'type'} eq 'tag') && ($tag->{'name'} eq $self->{content})){
 					push @{$out->{value}}, $tag;
 				}
@@ -112,11 +128,11 @@ sub eval {
 			return $out;
 		}
 
-		if ($input->{type} eq 'attributeset'){
+		if ($context->{type} eq 'attributeset'){
 
 			my $out = $self->ret('attributeset', []);
 
-			for my $attr(@{$input->{value}}){
+			for my $attr(@{$context->{value}}){
 
 				push @{$out->{value}}, $attr if $attr->{name} eq $self->{content};
 
@@ -125,14 +141,14 @@ sub eval {
 			return $out;
 		}
 
-		return $self->ret('Error', "filter by name $self->{content} on input $input->{type}");
+		return $self->ret('Error', "filter by name $self->{content} on context $context->{type}");
 
 
 	}elsif ($self->{type} eq 'NodeTypeTest'){
 
 		if ($self->{content} eq 'node'){
-			if ($input->{type} eq 'nodeset'){
-				return $input;
+			if ($context->{type} eq 'nodeset'){
+				return $context;
 			}else{
 				return $self->ret('Error', "can't filter node() on a non-nodeset value.");
 			}
@@ -147,9 +163,9 @@ sub eval {
 
 		my $out = $self->ret('nodeset', []);
 		my $i = 1;
-		my $c = scalar @{$input->{value}};
+		my $c = scalar @{$context->{value}};
 
-		for my $child(@{$input->{value}}){
+		for my $child(@{$context->{value}}){
 
 			$child->{proximity_position} = $i;
 			$child->{context_size} = $c;
@@ -216,7 +232,7 @@ sub eval {
 			if (defined $source){
 				$sig =~ s/\?$//;
 
-				my $out = $source->eval($input);
+				my $out = $source->eval($context);
 				return $out if $out->is_error;
 
 				my $value = undef;
@@ -241,7 +257,7 @@ sub eval {
 			}
 		}
 
-		return &{$func}($self, $input, \@args);
+		return &{$func}($self, \@args);
 
 	}elsif ($self->{type} eq 'FunctionArg'){
 
@@ -249,12 +265,12 @@ sub eval {
 
 		return $self->ret('Error', 'FunctionArg should have 1 token') unless 1 == scalar @{$self->{tokens}};
 
-		return $self->{tokens}->[0]->eval($input);
+		return $self->{tokens}->[0]->eval($context);
 
 	}elsif (($self->{type} eq 'EqualityExpr') || ($self->{type} eq 'RelationalExpr')){
 
-		my $v1 = $self->{tokens}->[0]->eval($input);
-		my $v2 = $self->{tokens}->[1]->eval($input);
+		my $v1 = $self->{tokens}->[0]->eval($context);
+		my $v2 = $self->{tokens}->[1]->eval($context);
 		my $t = "$v1->{type}/$v2->{type}";
 
 		return $v1 if $v1->is_error;
@@ -298,14 +314,8 @@ sub eval {
 
 	}elsif ($self->{type} eq 'UnionExpr'){
 
-		my $a1 = $self->{tokens}->[0]->eval($input);
-		my $a2 = $self->{tokens}->[1]->eval($input);
-
-		return $a1 if $a1->is_error;
-		return $a2 if $a2->is_error;
-
-		$a1 = $a1->get_nodeset;
-		$a2 = $a2->get_nodeset;
+		my $a1 = $self->get_child_arg(0, 'nodeset');
+		my $a2 = $self->get_child_arg(1, 'nodeset');
 
 		return $a1 if $a1->is_error;
 		return $a2 if $a2->is_error;
@@ -321,8 +331,8 @@ sub eval {
 
 	}elsif ($self->{type} eq 'MultiplicativeExpr'){
 
-		my $a1 = $self->get_child_arg($input, 0, 'number');
-		my $a2 = $self->get_child_arg($input, 1, 'number');
+		my $a1 = $self->get_child_arg(0, 'number');
+		my $a2 = $self->get_child_arg(1, 'number');
 
 		return $a1 if $a1->is_error;
 		return $a2 if $a2->is_error;
@@ -336,8 +346,8 @@ sub eval {
 
 	}elsif (($self->{type} eq 'OrExpr') || ($self->{type} eq 'AndExpr')){
 
-		my $a1 = $self->get_child_arg($input, 0, 'boolean');
-		my $a2 = $self->get_child_arg($input, 1, 'boolean');
+		my $a1 = $self->get_child_arg(0, 'boolean');
+		my $a2 = $self->get_child_arg(1, 'boolean');
 
 		return $a1 if $a1->is_error;
 		return $a2 if $a2->is_error;
@@ -347,8 +357,8 @@ sub eval {
 
 	}elsif ($self->{type} eq 'AdditiveExpr'){
 
-		my $a1 = $self->get_child_arg($input, 0, 'number');
-		my $a2 = $self->get_child_arg($input, 1, 'number');
+		my $a1 = $self->get_child_arg(0, 'number');
+		my $a2 = $self->get_child_arg(1, 'number');
 
 		return $a1 if $a1->is_error;
 		return $a2 if $a2->is_error;
@@ -359,290 +369,33 @@ sub eval {
 
 		return $self->ret('number', $result);
 
+	}elsif ($self->{type} eq 'UnaryExpr'){
+
+		my $a1 = $self->get_child_arg(0, 'number');
+
+		return $a1 if $a1->is_error;
+
+		$a1->{value} = - $a1->{value};
+
+		return $a1;
+
 	}else{
 		return $self->ret('Error', "Don't know how to eval a '$self->{type}' node.");
 	}
 }
 
 sub get_child_arg {
-	my ($self, $context, $pos, $type) = @_;
+	my ($self, $pos, $type) = @_;
 
 	my $token = $self->{tokens}->[$pos];
 	return $self->ret('Error', "Required child token {1+$pos} for $self->{type} token wasn't found.") unless defined $token;
 
-	my $out = $token->eval($context);
+	my $out = $token->eval($self->{context});
 	return $out if $out->is_error;
 
-	my $ret = undef;
-	$ret = $out->get_number if $type eq 'number';
-	$ret = $out->get_boolean if $type eq 'boolean';
-
-	return $self->ret('Error', "Can't convert token child to type $type") unless defined $ret;
-
-	return $ret;
+	return $out->get_type($type);
 }
 
-sub filter_axis {
-	my ($self, $axis, $input) = @_;
-
-	return $self->_axis_child($input)		if $axis eq 'child';
-	return $self->_axis_descendant($input, 0)	if $axis eq 'descendant';
-	return $self->_axis_descendant($input, 1)	if $axis eq 'descendant-or-self';
-	return $self->_axis_parent($input)		if $axis eq 'parent';
-	return $self->_axis_ancestor($input, 0)		if $axis eq 'ancestor';
-	return $self->_axis_ancestor($input, 1)		if $axis eq 'ancestor-or-self';
-	return $self->_axis_following_sibling($input)	if $axis eq 'following-sibling';
-	return $self->_axis_preceding_sibling($input)	if $axis eq 'preceding-sibling';
-	return $self->_axis_following($input)		if $axis eq 'following';
-	return $self->_axis_preceding($input)		if $axis eq 'preceding';
-	return $self->_axis_attribute($input)		if $axis eq 'attribute';
-
-	return $input if $axis eq 'self';
-
-	return $self->ret('Error', "Unknown axis '$axis'");
-}
-
-sub _axis_child {
-	my ($self, $in) = @_;
-
-	my $out = $self->ret('nodeset', []);
-
-	for my $tag(@{$in->{value}}){
-		for my $child(@{$tag->{children}}){
-			push @{$out->{value}}, $child;
-		}
-	}
-
-	return $out;
-}
-
-sub _axis_descendant {
-	my ($self, $in, $me) = @_;
-
-	my $out = $self->ret('nodeset', []);
-
-	for my $tag(@{$in->{value}}){
-
-		map{
-			push @{$out->{value}}, $_;
-
-		}$self->_axis_descendant_single($tag, $me);
-	}
-
-	return $out;
-}
-
-sub _axis_descendant_single {
-	my ($self, $tag, $me) = @_;
-
-	my @out;
-
-	push @out, $tag if $me;
-
-	for my $child(@{$tag->{children}}){
-
-		if ($child->{type} eq 'tag'){
-
-			map{
-				push @out, $_;
-			}$self->_axis_descendant_single($child, 1);
-		}
-	}
-
-	return @out;
-}
-
-sub _axis_attribute {
-	my ($self, $input) = @_;
-
-	my $out = $self->ret('attributeset', []);
-	my $node = undef;
-
-	if ($input->{type} eq 'nodeset'){
-		$node = shift @{$input->{value}};
-	}
-
-	if ($input->{type} eq 'node'){
-		$node = $input->{value};
-	}
-
-	return $self->ret('Error', "attribute axis can only filter single node (not a $input->{type})") unless defined $node;
-
-	for my $key(keys %{$node->{attributes}}){
-		push @{$out->{value}}, { 'name' => $key, 'value' => $node->{attributes}->{$key} };
-	}
-
-	return $out;
-}
-
-sub _axis_parent {
-	my ($self, $in) = @_;
-
-	my $out = $self->ret('nodeset', []);
-
-	for my $tag(@{$in->{value}}){
-		push @{$out->{value}}, $tag->{parent} if defined $tag->{parent};
-	}
-
-	return $out;
-}
-
-sub _axis_ancestor {
-	my ($self, $in, $me) = @_;
-
-	my $out = $self->ret('nodeset', []);
-
-	for my $tag(@{$in->{value}}){
-
-		map{
-			push @{$out->{value}}, $_;
-
-		}$self->_axis_ancestor_single($tag, $me);
-	}
-
-	return $out;
-}
-
-sub _axis_ancestor_single {
-	my ($self, $tag, $me) = @_;
-
-	my @out;
-
-	push @out, $tag if $me;
-
-	if (defined $tag->{parent}){
-
-		map{
-			push @out, $_;
-		}$self->_axis_ancestor_single($tag->{parent}, 1);
-	}
-
-	return @out;	
-}
-
-sub _axis_following_sibling {
-	my ($self, $in) = @_;
-
-	my $out = $self->ret('nodeset', []);
-
-	for my $tag(@{$in->{value}}){
-		if (defined $tag->{parent}){
-			my $parent = $tag->{parent};
-			my $found = 0;
-			for my $child(@{$parent->{children}}){
-				push @{$out->{value}}, $child if $found;
-				$found = 1 if $child->{order} == $tag->{order};
-			}
-		}
-	}
-
-	return $out;
-}
-
-sub _axis_preceding_sibling {
-	my ($self, $in) = @_;
-
-	my $out = $self->ret('nodeset', []);
-
-	for my $tag(@{$in->{value}}){
-		if (defined $tag->{parent}){
-			my $parent = $tag->{parent};
-			my $found = 0;
-			for my $child(@{$parent->{children}}){
-				$found = 1 if $child->{order} == $tag->{order};
-				push @{$out->{value}}, $child unless $found;
-			}
-		}
-	}
-
-	return $out;
-}
-
-sub _axis_following {
-	my ($self, $in) = @_;
-
-	my $min_order  = 1 + $self->{max_order};
-	for my $tag(@{$in->{value}}){
-		$min_order = $tag->{order} if $tag->{order} < $min_order;
-	}
-
-	# recurse the whole tree, adding after we find $min_order (but don't descend into it!)
-
-	my @tags = $self->_axis_following_recurse( $self->{root}->{value}->[0], $min_order );
-
-	return $self->ret('nodeset', \@tags);
-}
-
-sub _axis_following_recurse {
-	my ($self, $tag, $min) = @_;
-
-	my @out;
-
-	push @out, $tag if $tag->{order} > $min;
-
-	for my $child(@{$tag->{children}}){
-
-		if (($child->{order}) != $min && ($child->{type} eq 'tag')){
-
-			map{
-				push @out, $_;
-			}$self->_axis_following_recurse($child, $min);
-		}
-	}
-
-	return @out;
-}
-
-sub _axis_preceding {
-	my ($self, $in) = @_;
-
-	my $max_order = -1;
-	my $parents;
-	for my $tag(@{$in->{value}}){
-		if ($tag->{order} > $max_order){
-			$max_order = $tag->{order};
-			$parents = $self->_get_parent_orders($tag);
-		}
-	}
-
-	# recurse the whole tree, adding until we find $max_order (but don't descend into it!)
-
-	my @tags = $self->_axis_preceding_recurse( $self->{root}->{value}->[0], $parents, $max_order );
-
-	return $self->ret('nodeset', \@tags);
-}
-
-sub _axis_preceding_recurse {
-	my ($self, $tag, $parents, $max) = @_;
-
-	my @out;
-
-	push @out, $tag if $tag->{order} < $max && !$parents->{$tag->{order}};
-
-	for my $child(@{$tag->{children}}){
-
-		if (($child->{order}) != $max && ($child->{type} eq 'tag')){
-
-			map{
-				push @out, $_;
-			}$self->_axis_preceding_recurse($child, $parents, $max);
-		}
-	}
-
-	return @out;
-}
-
-sub _get_parent_orders {
-	my ($self, $tag) = @_;
-	my $parents;
-
-	while(defined $tag->{parent}){
-		$tag = $tag->{parent};
-		$parents->{$tag->{order}} = 1;
-	}
-
-	return $parents;
-}
 
 sub get_function_handler {
 	my ($self, $function) = @_;
@@ -692,13 +445,13 @@ sub get_function_handler {
 }
 
 sub function_last {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
-	return $self->ret('number', $input->{value}->{context_size});
+	return $self->ret('number', $self->{context}->{value}->{context_size});
 }
 
 sub function_not {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $out = $args->[0];
 	$out->{value} = !$out->{value};
@@ -707,12 +460,12 @@ sub function_not {
 }
 
 sub function_normalize_space {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $value = $args->[0];
 
 	unless (defined $value){
-		$value = $input->get_string;
+		$value = $self->{context}->get_string;
 		return $value if $value->get_error;
 	}
 
@@ -725,7 +478,7 @@ sub function_normalize_space {
 }
 
 sub function_count {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $subject = $args->[0];
 
@@ -734,15 +487,15 @@ sub function_count {
 }
 
 sub function_name {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $subject;
 
 	if (defined $args->[0]){
-		$subject = $args->[0]->eval($input);
+		$subject = $args->[0]->eval($self->{context});
 		return $subject if $subject->is_error;
 	}else{
-		$subject = $input;
+		$subject = $self->{context};
 	}
 
 	return $self->ret('string', $subject->{value}->{name}) if ($subject->{type} eq 'node');
@@ -758,7 +511,7 @@ sub function_name {
 }
 
 sub function_starts_with {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $s1 = $args->[0]->{value};
 	my $s2 = $args->[1]->{value};
@@ -767,7 +520,7 @@ sub function_starts_with {
 }
 
 sub function_contains {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $s1 = $args->[0]->{value};
 	my $s2 = quotemeta $args->[1]->{value};
@@ -776,12 +529,12 @@ sub function_contains {
 }
 
 sub function_string_length {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $value = $args->[0];
 
 	unless (defined $value){
-		$value = $input->get_string;
+		$value = $self->{context}->get_string;
 		return $value if $value->is_error;
 	}
 
@@ -789,9 +542,9 @@ sub function_string_length {
 }
 
 sub function_position {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
-	my $node = $input->get_nodeset;
+	my $node = $self->{context}->get_nodeset;
 	return $node if $node->is_error;
 
 	$node = $node->{value}->[0];
@@ -801,7 +554,7 @@ sub function_position {
 }
 
 sub function_floor {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $val = $args->[0]->{value};
 	my $ret = $self->simple_floor($val);
@@ -812,7 +565,7 @@ sub function_floor {
 }
 
 sub function_ceiling {
-	my ($self, $input, $args) = @_;
+	my ($self, $args) = @_;
 
 	my $val = $args->[0]->{value};
 	my $ret = $self->simple_ceiling($val);

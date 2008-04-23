@@ -2,10 +2,7 @@ use Test::More tests => 36;
 
 use lib 'lib';
 use strict;
-use XML::Parser::Lite::Tree::XPath::Tokener;
-use XML::Parser::Lite::Tree::XPath::Tree;
-use Data::Dumper;
-
+use XML::Parser::Lite::Tree::XPath::Test;
 
 
 test_tree(q!/aaa!,		'[LocationPath:absolute[Step[NameTest:aaa]]]');
@@ -52,37 +49,3 @@ test_tree(q!/bbb[ position() = floor(last-id() div 2 + 0.5) or position() = ceil
 	'[Number:0.5]]]]][EqualityExpr:=[FunctionCall:position][FunctionCall:ceiling[FunctionArg[AdditiveExpr:+'.
 	'[MultiplicativeExpr:div[FunctionCall:last-id][Number:2]][Number:0.5]]]]]]]]]');
 
-
-sub test_tree {
-	my ($path, $dump) = @_;
-
-	my $tokener = XML::Parser::Lite::Tree::XPath::Tokener->new();
-	if (!$tokener->parse($path)){
-		print "Path: $path\n";
-		print "Failed toke: ($tokener->{error})\n";
-		ok(0);
-		return;
-	}
-
-	my $tree = XML::Parser::Lite::Tree::XPath::Tree->new();
-	if (!$tree->build_tree($tokener->{tokens})){
-		print "Path: $path\n";
-		print "Failed tree: ($tree->{error})\n";
-		print Dumper $tree;
-		ok(0);
-		return;
-	}
-
-	my $dump_got = $tree->dump_flat();
-
-	ok($dump_got eq $dump);
-
-	unless ($dump_got eq $dump){
-		print "Path:     $path\n";
-		print "Expected: $dump\n";
-		print "Dump:     $dump_got\n";
-		print $tree->dump_tree();
-	}
-
-	return $dump_got;
-}

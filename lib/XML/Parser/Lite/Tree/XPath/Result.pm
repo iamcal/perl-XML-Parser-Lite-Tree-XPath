@@ -48,6 +48,15 @@ sub ret {
 	return  XML::Parser::Lite::Tree::XPath::Result->new($a, $b);
 }
 
+sub get_type {
+	my ($self, $type) = @_;
+
+	return $self->get_boolean if $type eq 'boolean';
+	return $self->get_number if $type eq 'number';
+	return $self->get_string if $type eq 'string';
+	return $self->get_nodeset if $type eq 'nodeset';
+}
+
 sub get_boolean {
 	my ($self) = @_;
 

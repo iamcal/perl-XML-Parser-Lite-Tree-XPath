@@ -39,7 +39,7 @@ sub build_tree {
 	#
 
 	return 0 unless $self->binops(['|'], 'UnionExpr');
-	# TODO: unary ops here
+	return 0 unless $self->recurse_before($self, 'unary_minus');
 	return 0 unless $self->binops(['*','div','mod'], 'MultiplicativeExpr');
 	return 0 unless $self->binops(['+','-'], 'AdditiveExpr');
 	return 0 unless $self->binops(['<','<=','>','>='], 'RelationalExpr');
@@ -662,6 +662,35 @@ sub del_links {
 		delete $token->{prev};
 		delete $token->{next};
 	}
+}
+
+sub unary_minus {
+	my ($self, $root) = @_;
+
+	$self->add_links($root);
+
+	my $tokens = $root->{tokens};
+	$root->{tokens} = [];
+
+	while(my $token = shift @{$tokens}){
+
+		if ($token->match('Operator', '-')){
+
+			if (defined($token->{next}) && defined($token->{prev}) && $token->{prev}->is_expression){
+
+				# not unary
+			}else{
+				# unary minus
+
+				$token->{type} = 'UnaryExpr';
+				push @{$token->{tokens}}, shift @{$tokens};
+			}
+		}
+
+		push @{$root->{tokens}}, $token;
+	}
+
+	return 1;
 }
 
 1;
