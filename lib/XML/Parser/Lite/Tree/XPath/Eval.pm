@@ -10,10 +10,12 @@ sub new {
 	return $self;
 }
 
-sub select_nodes {
+sub query {
 	my ($self, $xpath, $tree) = @_;
 	$self->{error} = 0;
 	$self->{tree} = $tree;
+
+	$self->{root} = XML::Parser::Lite::Tree::XPath::Result->new('nodeset', [$self->{tree}]);
 
 	$self->{max_order} = $self->mark_orders($self->{tree}, 1, undef);
 
@@ -23,13 +25,16 @@ sub select_nodes {
 		return 0;
 	}
 
-	my $in = XML::Parser::Lite::Tree::XPath::Token::Ret->new('nodeset', [$self->{tree}]);
-	my $out = $token->eval($in);
+	$self->mark_token($token);
+
+	my $out = $token->eval($self->{root});
 
 	if ($out->is_error){
 		$self->{error} = $out->{value};
 		return 0;
 	}
+
+	return $out;
 
 	if ($out->{type} ne 'nodeset'){
 		$self->{error} = "Result was not a nodeset (was a $out->{type})";
@@ -52,5 +57,12 @@ sub mark_orders {
 	return $i;
 }
 
+sub mark_token {
+	my ($self, $token) = @_;
+	$token->{root} = $self->{root};
+	for my $child(@{$token->{tokens}}){
+		$self->mark_token($child);
+	}
+}
 
 1;

@@ -7,6 +7,7 @@ lib/XML/Parser/Lite/Tree/XPath/Tokener.pm
 lib/XML/Parser/Lite/Tree/XPath/Token.pm
 lib/XML/Parser/Lite/Tree/XPath/Tree.pm
 lib/XML/Parser/Lite/Tree/XPath/Eval.pm
+lib/XML/Parser/Lite/Tree/XPath/Result.pm
 t/01_use.t
 t/02_tokener.t
 t/03_tree.t
@@ -18,3 +19,6 @@ t/05_zvon_04.t
 t/05_zvon_05.t
 t/05_zvon_06.t
 t/05_zvon_07.t
+t/05_zvon_08.t
+t/05_zvon_09.t
+t/05_zvon_10.t

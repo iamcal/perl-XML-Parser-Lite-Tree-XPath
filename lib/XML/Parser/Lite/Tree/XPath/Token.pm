@@ -1,5 +1,7 @@
 package XML::Parser::Lite::Tree::XPath::Token;
 
+use strict;
+use XML::Parser::Lite::Tree::XPath::Result;
 use Data::Dumper;
 
 sub new {
@@ -31,17 +33,28 @@ sub dump {
 
 sub ret {
 	my ($self, $a, $b) = @_;
-	return XML::Parser::Lite::Tree::XPath::Token::Ret->new($a, $b);
+	return XML::Parser::Lite::Tree::XPath::Result->new($a, $b);
 }
 
 sub eval {
 	my ($self, $input) = @_;
 
+	return $input if $input->is_error;
+
 	if ($self->{type} eq 'LocationPath'){
 
 		# a LocationPath should just be a list of Steps, so eval them in order
 
-		my $ret = $input;
+		my $ret;
+
+		if ($self->{absolute}){
+			$ret = $self->{root};
+		}else{
+			#die "relative path";
+			$ret = $input->get_nodeset;
+		}
+
+
 		for my $step(@{$self->{tokens}}){
 
 			unless ($step->match('Step')){
@@ -185,10 +198,50 @@ sub eval {
 		my $handler = $self->get_function_handler($self->{content});
 
 		if (!defined $handler){
-			return return $self->ret('Error', "No handler for function call '$self->{content}'");
+			return $self->ret('Error', "No handler for function call '$self->{content}'");
 		}
 
-		return &$handler($self, $input, $self->{tokens});
+		# prepare the arguments
+
+		my $func = $handler->[0];
+		my $sig = $handler->[1];
+
+		my @sig = split /,/, $sig;
+		my @args;
+
+		for my $sig(@sig){
+
+			my $source = $self->{tokens}->[scalar @args];
+
+			if (defined $source){
+				$sig =~ s/\?$//;
+
+				my $out = $source->eval($input);
+				return $out if $out->is_error;
+
+				my $value = undef;
+
+				$value = $out->get_string if $sig eq 'string';
+				$value = $out->get_number if $sig eq 'number';
+				$value = $out->get_nodeset if $sig eq 'nodeset';
+				$value = $out->get_boolean if $sig eq 'boolean';
+
+				return $self->ret('Error', "Can't coerce a function argument into a '$sig'") unless defined $value;
+				return $value if $value->is_error;
+
+				push @args, $value;
+
+			}else{
+				if ($sig =~ m/\?$/){
+					# it's ok - this arg was optional
+				}else{
+					my $num = 1 + scalar @args;
+					return $self->ret('Error', "Argument $num to function $self->{content} is required (type $sig)");
+				}
+			}
+		}
+
+		return &{$func}($self, $input, \@args);
 
 	}elsif ($self->{type} eq 'FunctionArg'){
 
@@ -198,7 +251,7 @@ sub eval {
 
 		return $self->{tokens}->[0]->eval($input);
 
-	}elsif ($self->{type} eq 'EqualityExpr'){
+	}elsif (($self->{type} eq 'EqualityExpr') || ($self->{type} eq 'RelationalExpr')){
 
 		my $v1 = $self->{tokens}->[0]->eval($input);
 		my $v2 = $self->{tokens}->[1]->eval($input);
@@ -219,7 +272,8 @@ sub eval {
 				my $v1_s = $self->ret('attribute', $attr)->get_string;
 				my $ok = $self->compare_op($self->{content}, $v1_s, $v2);
 
-				return $self->ret('boolean', 1) if $ok;
+				return $ok if $ok->is_error;
+				return $ok if $ok->{value};
 			}
 
 			return $self->ret('boolean', 0);
@@ -227,7 +281,12 @@ sub eval {
 
 		if ($t eq 'string/string'){
 
-			return $self->ret('boolean',  $self->compare_op($self->{content}, $v1, $v2));
+			return $self->compare_op($self->{content}, $v1, $v2);
+		}
+
+		if ($t eq 'number/number'){
+
+			return $self->compare_op($self->{content}, $v1, $v2);
 		}
 
 		return $self->ret('Error', "can't do an EqualityExpr on $t");
@@ -315,10 +374,17 @@ sub _axis_attribute {
 	my ($self, $input) = @_;
 
 	my $out = $self->ret('attributeset', []);
+	my $node = undef;
 
-	return $self->ret('Error', "attribute axis can only filter single node (not a $input->{type})") unless $input->{type} eq 'node';
+	if ($input->{type} eq 'nodeset'){
+		$node = shift @{$input->{value}};
+	}
 
-	my $node = $input->{value};
+	if ($input->{type} eq 'node'){
+		$node = $input->{value};
+	}
+
+	return $self->ret('Error', "attribute axis can only filter single node (not a $input->{type})") unless defined $node;
 
 	for my $key(keys %{$node->{attributes}}){
 		push @{$out->{value}}, { 'name' => $key, 'value' => $node->{attributes}->{$key} };
@@ -331,10 +397,14 @@ sub get_function_handler {
 	my ($self, $function) = @_;
 
 	my $function_map = {
-		'last'			=> 'function_last',
-		'not'			=> 'function_not',
-		'normalize-space'	=> 'function_normalize_space',
-		'count'			=> 'function_count',
+		'last'			=> [\&function_last,		'',			],
+		'not'			=> [\&function_not,		'boolean',		],
+		'normalize-space'	=> [\&function_normalize_space,	'string?',		],
+		'count'			=> [\&function_count,		'nodeset',		],
+		'name'			=> [\&function_name,		'nodeset?',		],
+		'starts-with'		=> [\&function_starts_with,	'string,string',	],
+		'contains'		=> [\&function_contains,	'string,string',	],
+		'string-length'		=> [\&function_string_length,	'string?',		],
 	};
 
 	return $function_map->{$function} if defined $function_map->{$function};
@@ -351,13 +421,7 @@ sub function_last {
 sub function_not {
 	my ($self, $input, $args) = @_;
 
-	return $self->ret('Error', "not() needs an argument") unless 1 == scalar @{$args};
-
-	my $ret = $args->[0]->eval($input);
-	return $ret if $ret->is_error;
-
-	my $out = $ret->get_boolean;
-
+	my $out = $args->[0];
 	$out->{value} = !$out->{value};
 
 	return $out
@@ -366,17 +430,14 @@ sub function_not {
 sub function_normalize_space {
 	my ($self, $input, $args) = @_;
 
-	my $value;
+	my $value = $args->[0];
 
-	if (scalar @{$args}){
-		my $out = $args->[0]->eval($input);
-		return $out if $out->is_error;
-
-		$value = $out->get_string->{value};
-	}else{
-		$value = $input->get_string->{value};
+	unless (defined $value){
+		$value = $input->get_string;
+		return $value if $value->get_error;
 	}
 
+	$value = $value->{value};
 	$value =~ s!^[\x20\x09\x0d\x0a]+!!;
 	$value =~ s![\x20\x09\x0d\x0a]+$!!;
 	$value =~ s![\x20\x09\x0d\x0a]+! !g;
@@ -387,131 +448,89 @@ sub function_normalize_space {
 sub function_count {
 	my ($self, $input, $args) = @_;
 
-	print Dumper $input;
-	print Dumper $args;
-	die;
+	my $subject = $args->[0];
 
-	return $self->ret('Error', 'count() requires a single argument') unless 1 == scalar @{$args};
+	return $self->ret('number', scalar(@{$subject->{value}})) if $subject->{type} eq 'nodeset';
+	return $self->ret('number', scalar(@{$subject->{value}})) if $subject->{type} eq 'attributeset';
+}
 
-	my $out = $args->[0]->eval($input);
+sub function_name {
+	my ($self, $input, $args) = @_;
 
-	return $self->ret('number', scalar($out->{value})) if $out->{type} eq 'nodeset';
-	return $self->ret('number', scalar($out->{value})) if $out->{type} eq 'attributeset';
+	my $subject;
 
-	return $self->ret('Error', 'count() requires a nodeset argument');
+	if (defined $args->[0]){
+		$subject = $args->[0]->eval($input);
+		return $subject if $subject->is_error;
+	}else{
+		$subject = $input;
+	}
+
+	return $self->ret('string', $subject->{value}->{name}) if ($subject->{type} eq 'node');
+
+	if ($subject->{type} eq 'nodeset'){
+		my $node = shift @{$subject->{value}};
+		
+		return $self->ret('string', $node->{name}) if defined $node;
+		return $self->ret('Error', "Can't perform name() on an empty nodeset");
+	}
+
+	return $self->ret('Error', "Can't perform name() function on a '$subject->{type}'");
+}
+
+sub function_starts_with {
+	my ($self, $input, $args) = @_;
+
+	my $s1 = $args->[0]->{value};
+	my $s2 = $args->[1]->{value};
+
+	return $self->ret('boolean', (substr($s1, 0, length $s2) eq $s2));
+}
+
+sub function_contains {
+	my ($self, $input, $args) = @_;
+
+	my $s1 = $args->[0]->{value};
+	my $s2 = quotemeta $args->[1]->{value};
+
+	return $self->ret('boolean', ($s1 =~ /$s2/));
+}
+
+sub function_string_length {
+	my ($self, $input, $args) = @_;
+
+	my $value = $args->[0];
+
+	unless (defined $value){
+		$value = $input->get_string;
+		return $value if $value->is_error;
+	}
+
+	return $self->ret('number', length $value->{value});
 }
 
 sub compare_op {
 	my ($self, $op, $a1, $a2) = @_;
 
 	if ($a1->{type} eq 'string'){
-		if ($op eq '='){
-			return ($a1->{value} eq $a2->{value}) ? 1 : 0;
-		}else{
-			return ($a1->{value} ne $a2->{value}) ? 1 : 0;
-		}
+		if ($op eq '=' ){ return $self->ret('boolean', ($a1->{value} eq $a2->{value}) ? 1 : 0); }
+		if ($op eq '!='){ return $self->ret('boolean', ($a1->{value} ne $a2->{value}) ? 1 : 0); }
+		if ($op eq '>='){ return $self->ret('boolean', ($a1->{value} ge $a2->{value}) ? 1 : 0); }
+		if ($op eq '<='){ return $self->ret('boolean', ($a1->{value} le $a2->{value}) ? 1 : 0); }
+		if ($op eq '>' ){ return $self->ret('boolean', ($a1->{value} gt $a2->{value}) ? 1 : 0); }
+		if ($op eq '<' ){ return $self->ret('boolean', ($a1->{value} lt $a2->{value}) ? 1 : 0); }
 	}
 
-	return $self->ret('Error', "compare $op one type $a1->{type}");
-}
-
-package XML::Parser::Lite::Tree::XPath::Token::Ret;
-
-#
-# types:
-#
-# number
-# boolean
-# string
-# nodeset
-# attributeset
-# node
-# attribute
-#
-
-sub new {
-	my $class = shift;
-	my $self = bless {}, $class;
-
-	$self->{type} = shift;
-	$self->{value} = shift;
-
-	return $self;
-}
-
-sub is_error {
-	my ($self) = @_;
-	return ($self->{type} eq 'Error') ? 1 : 0;
-}
-
-sub normalize {
-	my ($self) = @_;
-
-	if ($self->{type} eq 'nodeset'){
-
-		# uniquify and sort
-		my %seen = ();
-		my @tags =  sort { $a->{order} <=> $b->{order} } grep { ! $seen{$_->{order}} ++ } @{$self->{value}};
-
-		$self->{value} = \@tags;
-	}
-}
-
-sub ret {
-	my ($self, $a, $b) = @_;
-	return  XML::Parser::Lite::Tree::XPath::Token::Ret->new($a, $b);
-}
-
-sub get_boolean {
-	my ($self) = @_;
-
-	return $self if $self->{type} eq 'boolean';
-
-	if ($self->{type} eq 'number'){
-		return $self->ret('boolean', 0) if $self->{value} eq 'NaN';
-		return $self->ret('boolean', $self->{value} != 0);
+	if ($a1->{type} eq 'number'){
+		if ($op eq '=' ){ return $self->ret('boolean', ($a1->{value} == $a2->{value}) ? 1 : 0); }
+		if ($op eq '!='){ return $self->ret('boolean', ($a1->{value} != $a2->{value}) ? 1 : 0); }
+		if ($op eq '>='){ return $self->ret('boolean', ($a1->{value} >= $a2->{value}) ? 1 : 0); }
+		if ($op eq '<='){ return $self->ret('boolean', ($a1->{value} <= $a2->{value}) ? 1 : 0); }
+		if ($op eq '>' ){ return $self->ret('boolean', ($a1->{value} >  $a2->{value}) ? 1 : 0); }
+		if ($op eq '<' ){ return $self->ret('boolean', ($a1->{value} <  $a2->{value}) ? 1 : 0); }
 	}
 
-	if ($self->{type} eq 'nodeset'){
-		return $self->ret('boolean', scalar(@{$self->{value}}) > 0);
-	}
-
-	if ($self->{type} eq 'attributeset'){
-		return $self->ret('boolean', scalar(@{$self->{value}}) > 0);
-	}
-
-	die "$self->{value}" if $self->{type} eq 'Error';
-
-	die "can't convert type $self->{type} to boolean";
-}
-
-sub get_string {
-	my ($self) = @_;
-
-	return $self if $self->{type} eq 'string';
-
-	if ($self->{type} eq 'nodeset'){
-		return $self->ret('string', '') unless scalar @{$self->{value}};
-
-		my $node = $self->ret('node', $self->{value}->[0]);
-
-		return $node->get_string;
-	}
-
-	if ($self->{type} eq 'attributeset'){
-
-		return $self->ret('string', '') unless scalar @{$self->{value}};
-
-		my $node = $self->ret('attribute', $self->{value}->[0]);
-
-		return $node->get_string;
-	}
-
-	if ($self->{type} eq 'attribute'){
-		return $self->ret('string', $self->{value}->{value});
-	}
-
-	die "can't convert type $self->{type} to string";
+	return $self->ret('Error', "Don't know how to compare $op on type $a1->{type}");
 }
 
 1;

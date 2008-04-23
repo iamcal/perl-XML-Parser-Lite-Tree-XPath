@@ -1,4 +1,4 @@
-use Test::More tests => 11;
+use Test::More tests => 13;
 
 use lib 'lib';
 use strict;
@@ -30,8 +30,6 @@ test_nodeset(
 		{'nodename' => 'ddd', 'id' => 'd1'},
 	]
 );
-
-__END__
 
 test_nodeset(
 	'//*[count(*)=2]',

@@ -5,7 +5,7 @@ use XML::Parser::Lite::Tree::XPath::Tokener;
 use XML::Parser::Lite::Tree::XPath::Tree;
 use XML::Parser::Lite::Tree::XPath::Eval;
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 # v0.10 - tokener finished
 # v0.11 - tree builder started
@@ -13,6 +13,7 @@ our $VERSION = '0.16';
 # v0.14 - started on the eval engine - zvon examples 1 and 2 eval correctly (t/05_zvon0[12].t)
 # v0.15 - more eval engine work - zvon examples 3,4,5 and some of 6
 # v0.16 - more eval engine work - 6 and some of 7 (ret type coersion)
+# v0.17 - more eval engine work - 7,8,9 (function arg validation)
 
 sub new {
 	my $class = shift;
@@ -23,7 +24,7 @@ sub new {
 	return $self;
 }
 
-sub select_nodes {
+sub query {
 	my ($self, $xpath) = @_;
 
 	#
@@ -56,11 +57,26 @@ sub select_nodes {
 
 	my $eval = XML::Parser::Lite::Tree::XPath::Eval->new();
 
-	my $ret = $eval->select_nodes($xtree, $self->{tree});
+	my $out = $eval->query($xtree, $self->{tree});
 
 	$self->{error} = $eval->{error};
 
-	return $ret;
+	return $out;
+}
+
+sub select_nodes {
+	my ($self, $xpath) = @_;
+
+	my $out = $self->query($xpath);
+
+	return 0 unless $out;
+
+	if ($out->{type} ne 'nodeset'){
+                $self->{error} = "Result was not a nodeset (was a $out->{type})";
+                return 0;
+        }
+
+        return $out->{value};
 }
 
 1;
