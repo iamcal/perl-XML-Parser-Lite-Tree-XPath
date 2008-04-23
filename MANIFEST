@@ -9,6 +9,7 @@ lib/XML/Parser/Lite/Tree/XPath/Tree.pm
 lib/XML/Parser/Lite/Tree/XPath/Eval.pm
 lib/XML/Parser/Lite/Tree/XPath/Result.pm
 lib/XML/Parser/Lite/Tree/XPath/Axis.pm
+lib/XML/Parser/Lite/Tree/XPath/Test.pm
 t/01_use.t
 t/02_tokener.t
 t/03_tree.t
