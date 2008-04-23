@@ -113,4 +113,12 @@ sub get_nodeset {
 	die "can't convert type $self->{type} to nodeset";
 }
 
+sub get_number {
+	my ($self) = @_;
+
+	return $self if $self->{type} eq 'number';
+
+	die "can't convert type $self->{type} to number";
+}
+
 1;

@@ -16,7 +16,6 @@ sub query {
 	$self->{tree} = $tree;
 
 	$self->{root} = XML::Parser::Lite::Tree::XPath::Result->new('nodeset', [$self->{tree}]);
-
 	$self->{max_order} = $self->mark_orders($self->{tree}, 1, undef);
 
 	my $token = $xpath->{tokens}->[0];
@@ -59,7 +58,10 @@ sub mark_orders {
 
 sub mark_token {
 	my ($self, $token) = @_;
+
 	$token->{root} = $self->{root};
+	$token->{max_order} = $self->{max_order};
+
 	for my $child(@{$token->{tokens}}){
 		$self->mark_token($child);
 	}

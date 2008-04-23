@@ -5,7 +5,7 @@ use XML::Parser::Lite::Tree::XPath::Tokener;
 use XML::Parser::Lite::Tree::XPath::Tree;
 use XML::Parser::Lite::Tree::XPath::Eval;
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 # v0.10 - tokener finished
 # v0.11 - tree builder started
@@ -14,6 +14,7 @@ our $VERSION = '0.17';
 # v0.15 - more eval engine work - zvon examples 3,4,5 and some of 6
 # v0.16 - more eval engine work - 6 and some of 7 (ret type coersion)
 # v0.17 - more eval engine work - 7,8,9 (function arg validation)
+# v0.18 - more eval engine work - 1-22 (function map, arg validation, axis handlers)
 
 sub new {
 	my $class = shift;

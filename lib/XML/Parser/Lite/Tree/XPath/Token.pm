@@ -197,7 +197,7 @@ sub eval {
 
 		my $handler = $self->get_function_handler($self->{content});
 
-		if (!defined $handler){
+		if ((!defined $handler) || (!defined $handler->[0])){
 			return $self->ret('Error', "No handler for function call '$self->{content}'");
 		}
 
@@ -295,9 +295,91 @@ sub eval {
 
 		return $self->ret('string', $self->{content});
 
+
+	}elsif ($self->{type} eq 'UnionExpr'){
+
+		my $a1 = $self->{tokens}->[0]->eval($input);
+		my $a2 = $self->{tokens}->[1]->eval($input);
+
+		return $a1 if $a1->is_error;
+		return $a2 if $a2->is_error;
+
+		$a1 = $a1->get_nodeset;
+		$a2 = $a2->get_nodeset;
+
+		return $a1 if $a1->is_error;
+		return $a2 if $a2->is_error;
+
+		my $out = $self->ret('nodeset', []);
+
+		map{ push @{$out->{value}}, $_ } @{$a1->{value}};
+		map{ push @{$out->{value}}, $_ } @{$a2->{value}};
+
+		$out->normalize();
+
+		return $out;
+
+	}elsif ($self->{type} eq 'MultiplicativeExpr'){
+
+		my $a1 = $self->get_child_arg($input, 0, 'number');
+		my $a2 = $self->get_child_arg($input, 1, 'number');
+
+		return $a1 if $a1->is_error;
+		return $a2 if $a2->is_error;
+
+		my $result = 0;
+		$result = $a1->{value} * $a2->{value} if $self->{content} eq '*';
+		$result = $self->op_mod($a1->{value}, $a2->{value}) if $self->{content} eq 'mod';
+		$result = $self->op_div($a1->{value}, $a2->{value}) if $self->{content} eq 'div';
+
+		return $self->ret('number', $result);
+
+	}elsif (($self->{type} eq 'OrExpr') || ($self->{type} eq 'AndExpr')){
+
+		my $a1 = $self->get_child_arg($input, 0, 'boolean');
+		my $a2 = $self->get_child_arg($input, 1, 'boolean');
+
+		return $a1 if $a1->is_error;
+		return $a2 if $a2->is_error;
+
+		return $self->ret('boolean', $a1->{value} || $a2->{value}) if $self->{type} eq 'OrExpr';
+		return $self->ret('boolean', $a1->{value} && $a2->{value}) if $self->{type} eq 'AndExpr';
+
+	}elsif ($self->{type} eq 'AdditiveExpr'){
+
+		my $a1 = $self->get_child_arg($input, 0, 'number');
+		my $a2 = $self->get_child_arg($input, 1, 'number');
+
+		return $a1 if $a1->is_error;
+		return $a2 if $a2->is_error;
+
+		my $result = 0;
+		$result = $a1->{value} + $a2->{value} if $self->{content} eq '+';
+		$result = $a1->{value} - $a2->{value} if $self->{content} eq '-';
+
+		return $self->ret('number', $result);
+
 	}else{
 		return $self->ret('Error', "Don't know how to eval a '$self->{type}' node.");
 	}
+}
+
+sub get_child_arg {
+	my ($self, $context, $pos, $type) = @_;
+
+	my $token = $self->{tokens}->[$pos];
+	return $self->ret('Error', "Required child token {1+$pos} for $self->{type} token wasn't found.") unless defined $token;
+
+	my $out = $token->eval($context);
+	return $out if $out->is_error;
+
+	my $ret = undef;
+	$ret = $out->get_number if $type eq 'number';
+	$ret = $out->get_boolean if $type eq 'boolean';
+
+	return $self->ret('Error', "Can't convert token child to type $type") unless defined $ret;
+
+	return $ret;
 }
 
 sub filter_axis {
@@ -393,18 +475,215 @@ sub _axis_attribute {
 	return $out;
 }
 
+sub _axis_parent {
+	my ($self, $in) = @_;
+
+	my $out = $self->ret('nodeset', []);
+
+	for my $tag(@{$in->{value}}){
+		push @{$out->{value}}, $tag->{parent} if defined $tag->{parent};
+	}
+
+	return $out;
+}
+
+sub _axis_ancestor {
+	my ($self, $in, $me) = @_;
+
+	my $out = $self->ret('nodeset', []);
+
+	for my $tag(@{$in->{value}}){
+
+		map{
+			push @{$out->{value}}, $_;
+
+		}$self->_axis_ancestor_single($tag, $me);
+	}
+
+	return $out;
+}
+
+sub _axis_ancestor_single {
+	my ($self, $tag, $me) = @_;
+
+	my @out;
+
+	push @out, $tag if $me;
+
+	if (defined $tag->{parent}){
+
+		map{
+			push @out, $_;
+		}$self->_axis_ancestor_single($tag->{parent}, 1);
+	}
+
+	return @out;	
+}
+
+sub _axis_following_sibling {
+	my ($self, $in) = @_;
+
+	my $out = $self->ret('nodeset', []);
+
+	for my $tag(@{$in->{value}}){
+		if (defined $tag->{parent}){
+			my $parent = $tag->{parent};
+			my $found = 0;
+			for my $child(@{$parent->{children}}){
+				push @{$out->{value}}, $child if $found;
+				$found = 1 if $child->{order} == $tag->{order};
+			}
+		}
+	}
+
+	return $out;
+}
+
+sub _axis_preceding_sibling {
+	my ($self, $in) = @_;
+
+	my $out = $self->ret('nodeset', []);
+
+	for my $tag(@{$in->{value}}){
+		if (defined $tag->{parent}){
+			my $parent = $tag->{parent};
+			my $found = 0;
+			for my $child(@{$parent->{children}}){
+				$found = 1 if $child->{order} == $tag->{order};
+				push @{$out->{value}}, $child unless $found;
+			}
+		}
+	}
+
+	return $out;
+}
+
+sub _axis_following {
+	my ($self, $in) = @_;
+
+	my $min_order  = 1 + $self->{max_order};
+	for my $tag(@{$in->{value}}){
+		$min_order = $tag->{order} if $tag->{order} < $min_order;
+	}
+
+	# recurse the whole tree, adding after we find $min_order (but don't descend into it!)
+
+	my @tags = $self->_axis_following_recurse( $self->{root}->{value}->[0], $min_order );
+
+	return $self->ret('nodeset', \@tags);
+}
+
+sub _axis_following_recurse {
+	my ($self, $tag, $min) = @_;
+
+	my @out;
+
+	push @out, $tag if $tag->{order} > $min;
+
+	for my $child(@{$tag->{children}}){
+
+		if (($child->{order}) != $min && ($child->{type} eq 'tag')){
+
+			map{
+				push @out, $_;
+			}$self->_axis_following_recurse($child, $min);
+		}
+	}
+
+	return @out;
+}
+
+sub _axis_preceding {
+	my ($self, $in) = @_;
+
+	my $max_order = -1;
+	my $parents;
+	for my $tag(@{$in->{value}}){
+		if ($tag->{order} > $max_order){
+			$max_order = $tag->{order};
+			$parents = $self->_get_parent_orders($tag);
+		}
+	}
+
+	# recurse the whole tree, adding until we find $max_order (but don't descend into it!)
+
+	my @tags = $self->_axis_preceding_recurse( $self->{root}->{value}->[0], $parents, $max_order );
+
+	return $self->ret('nodeset', \@tags);
+}
+
+sub _axis_preceding_recurse {
+	my ($self, $tag, $parents, $max) = @_;
+
+	my @out;
+
+	push @out, $tag if $tag->{order} < $max && !$parents->{$tag->{order}};
+
+	for my $child(@{$tag->{children}}){
+
+		if (($child->{order}) != $max && ($child->{type} eq 'tag')){
+
+			map{
+				push @out, $_;
+			}$self->_axis_preceding_recurse($child, $parents, $max);
+		}
+	}
+
+	return @out;
+}
+
+sub _get_parent_orders {
+	my ($self, $tag) = @_;
+	my $parents;
+
+	while(defined $tag->{parent}){
+		$tag = $tag->{parent};
+		$parents->{$tag->{order}} = 1;
+	}
+
+	return $parents;
+}
+
 sub get_function_handler {
 	my ($self, $function) = @_;
 
 	my $function_map = {
-		'last'			=> [\&function_last,		'',			],
-		'not'			=> [\&function_not,		'boolean',		],
-		'normalize-space'	=> [\&function_normalize_space,	'string?',		],
-		'count'			=> [\&function_count,		'nodeset',		],
-		'name'			=> [\&function_name,		'nodeset?',		],
-		'starts-with'		=> [\&function_starts_with,	'string,string',	],
-		'contains'		=> [\&function_contains,	'string,string',	],
-		'string-length'		=> [\&function_string_length,	'string?',		],
+
+		# nodeset functions
+		'last'			=> [\&function_last,		''			],
+		'position'		=> [\&function_position,	''			],
+		'count'			=> [\&function_count,		'nodeset'		],
+		'id'			=> [undef,			'any'			],
+		'local-name'		=> [undef,			'nodeset?'		],
+		'namespace-uri'		=> [undef,			'nodeset?'		],
+		'name'			=> [\&function_name,		'nodeset?'		],
+
+		# string functions
+		'string'		=> [undef,			'any?'			],
+		'concat'		=> [undef,			'string,string+'	],
+		'starts-with'		=> [\&function_starts_with,	'string,string'		],
+		'contains'		=> [\&function_contains,	'string,string'		],
+		'substring-before'	=> [undef,			'string,string'		],
+		'substring-after'	=> [undef,			'string,string'		],
+		'substring'		=> [undef,			'string,number,number?'	],
+		'string-length'		=> [\&function_string_length,	'string?'		],
+		'normalize-space'	=> [\&function_normalize_space,	'string?'		],
+		'translate'		=> [undef,			'string,string,string'	],
+
+		# boolean functions
+		'boolean'		=> [undef,			'any'			],
+		'not'			=> [\&function_not,		'boolean'		],
+		'true'			=> [undef,			''			],
+		'false'			=> [undef,			''			],
+		'lang'			=> [undef,			'string'		],
+
+		# number functions
+		'number'		=> [undef,			'any?'			],
+		'sum'			=> [undef,			'nodeset'		],
+		'floor'			=> [\&function_floor,		'number'		],
+		'ceiling'		=> [\&function_ceiling,		'number'		],
+		'round'			=> [undef,			'number'		],
+
 	};
 
 	return $function_map->{$function} if defined $function_map->{$function};
@@ -509,6 +788,52 @@ sub function_string_length {
 	return $self->ret('number', length $value->{value});
 }
 
+sub function_position {
+	my ($self, $input, $args) = @_;
+
+	my $node = $input->get_nodeset;
+	return $node if $node->is_error;
+
+	$node = $node->{value}->[0];
+	return $self->ret('Error', "No node in context nodeset o_O") unless defined $node;
+
+	return $self->ret('number', $node->{proximity_position});
+}
+
+sub function_floor {
+	my ($self, $input, $args) = @_;
+
+	my $val = $args->[0]->{value};
+	my $ret = $self->simple_floor($val);
+
+	$ret = - $self->simple_ceiling(-$val) if $val < 0;
+
+	return $self->ret('number', $ret);
+}
+
+sub function_ceiling {
+	my ($self, $input, $args) = @_;
+
+	my $val = $args->[0]->{value};
+	my $ret = $self->simple_ceiling($val);
+
+	$ret = - $self->simple_floor(-$val) if $val < 0;
+
+	return $self->ret('number', $ret);
+}
+
+sub simple_floor {
+	my ($self, $value) = @_;
+	return int $value;
+}
+
+sub simple_ceiling {
+	my ($self, $value) = @_;
+	my $t = int $value;
+	return $t if $t == $value;
+	return $t+1;
+}
+
 sub compare_op {
 	my ($self, $op, $a1, $a2) = @_;
 
@@ -531,6 +856,19 @@ sub compare_op {
 	}
 
 	return $self->ret('Error', "Don't know how to compare $op on type $a1->{type}");
+}
+
+sub op_mod {
+	my ($self, $n1, $n2) = @_;
+
+	my $r = int ($n1 / $n2);
+	return $n1 - ($r * $n2);
+}
+
+sub op_div {
+	my ($self, $n1, $n2) = @_;
+
+	return $n1 / $n2;
 }
 
 1;
