@@ -121,7 +121,7 @@ sub make_groups {
 
 		if ($token->match('Symbol', '(')){
 
-			my $group = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $group = XML::Parser::Lite::Tree::XPath::Token->new();
 			$group->{type} = 'Group()';
 			$group->{tokens} = [];
 			$group->{parent} = $parent;
@@ -131,7 +131,7 @@ sub make_groups {
 
 		}elsif ($token->match('Symbol', '[')){
 
-			my $group = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $group = XML::Parser::Lite::Tree::XPath::Token->new();
 			$group->{type} = 'Predicate';
 			$group->{tokens} = [];
 			$group->{parent} = $parent;
@@ -316,7 +316,7 @@ sub make_arg_list {
 	# no need to construct an arg list if there aren't any args
 	return 1 unless scalar @{$arg_group->{tokens}};
 
-	my $arg = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+	my $arg = XML::Parser::Lite::Tree::XPath::Token->new();
 	$arg->{type} = 'FunctionArg';
 	$arg->{tokens} = [];
 
@@ -326,7 +326,7 @@ sub make_arg_list {
 
 			push @{$root->{tokens}}, $arg;
 
-			$arg = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$arg = XML::Parser::Lite::Tree::XPath::Token->new();
 			$arg->{type} = 'FunctionArg';
 			$arg->{tokens} = [];
 
@@ -380,22 +380,22 @@ sub clean_axis_and_abbreviations {
 
 			# // == /descendant-or-self::node()/
 
-			$token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'Operator';
 			$token->{content} = '/';
 			push @{$root->{tokens}}, $token;
 
-			$token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'AxisSpecifier';
 			$token->{content} = 'descendant-or-self';
 			push @{$root->{tokens}}, $token;
 
-			$token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'NodeTypeTest';
 			$token->{content} = 'node';
 			push @{$root->{tokens}}, $token;
 
-			$token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'Operator';
 			$token->{content} = '/';
 			push @{$root->{tokens}}, $token;
@@ -403,12 +403,12 @@ sub clean_axis_and_abbreviations {
 
 		}elsif ($token->match('Symbol', '.')){
 
-			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'AxisSpecifier';
 			$token->{content} = 'self';
 			push @{$root->{tokens}}, $token;
 
-			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'NodeTypeTest';
 			$token->{content} = 'node';
 			push @{$root->{tokens}}, $token;
@@ -416,12 +416,12 @@ sub clean_axis_and_abbreviations {
 
 		}elsif ($token->match('Symbol', '..')){
 
-			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'AxisSpecifier';
 			$token->{content} = 'parent';
 			push @{$root->{tokens}}, $token;
 
-			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'NodeTypeTest';
 			$token->{content} = 'node';
 			push @{$root->{tokens}}, $token;
@@ -460,11 +460,11 @@ sub build_steps {
 				return 0;
 			}
 
-			my $step = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $step = XML::Parser::Lite::Tree::XPath::Token->new();
 			$step->{type} = 'Step';
+			$step->{axis} = $token->{content};
 			$step->{tokens} = [];
 
-			push @{$step->{tokens}}, $token;
 			push @{$step->{tokens}}, $next;
 
 
@@ -484,7 +484,7 @@ sub build_steps {
 
 		}elsif ($token->match('NodeTypeTest') || $token->match('NameTest')){
 
-			my $step = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $step = XML::Parser::Lite::Tree::XPath::Token->new();
 			$step->{type} = 'Step';
 			$step->{tokens} = [];
 
@@ -529,7 +529,7 @@ sub build_paths {
 
 		if ($token->match('Step')){
 
-			my $path = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $path = XML::Parser::Lite::Tree::XPath::Token->new();
 			$path->{type} = 'LocationPath';
 			$path->{absolute} = 0;
 			$path->{tokens} = [$token];
@@ -542,7 +542,7 @@ sub build_paths {
 
 			unshift @{$tokens}, $token;
 
-			my $path = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			my $path = XML::Parser::Lite::Tree::XPath::Token->new();
 			$path->{type} = 'LocationPath';
 			$path->{absolute} = 1;
 			$path->{tokens} = [];

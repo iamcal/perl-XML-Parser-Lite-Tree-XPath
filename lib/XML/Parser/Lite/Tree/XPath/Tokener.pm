@@ -1,5 +1,7 @@
 package XML::Parser::Lite::Tree::XPath::Tokener;
 
+use XML::Parser::Lite::Tree::XPath::Token;
+
 sub new {
 	my $class = shift;
  	my $self = bless {}, $class;
@@ -156,7 +158,7 @@ sub step {
 sub push_token {
 	my ($self, $type, $content) = @_;
 
-	my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+	my $token = XML::Parser::Lite::Tree::XPath::Token->new();
 	$token->{type} = $type;
 	$token->{content} = $content if defined $content;
 
