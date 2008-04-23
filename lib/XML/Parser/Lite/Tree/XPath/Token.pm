@@ -34,25 +34,6 @@ sub ret {
 	return XML::Parser::Lite::Tree::XPath::Token::Ret->new($a, $b);
 }
 
-sub get_return_type {
-	my ($self) = @_;
-	return 'number' if $self->{type} eq 'Number';
-	return 'number' if $self->{type} eq 'FunctionCall' && $self->{content} eq 'last';
-	return 'boolean' if $self->{type} eq 'FunctionCall' && $self->{content} eq 'not';
-	return 'boolean' if $self->{type} eq 'EqualityExpr';
-
-	if ($self->{type} eq 'LocationPath'){
-
-		my $last_step = $self->{tokens}->[-1];
-
-		if ($last_step->{axis} eq 'attribute'){
-			return 'attributeset';
-		}
-	}
-
-	die "node type $self->{type} has undefined return type";
-}
-
 sub eval {
 	my ($self, $input) = @_;
 
@@ -69,9 +50,9 @@ sub eval {
 
 			$ret = $step->eval($ret);
 
-			$ret->normalize();
-
 			return $ret if $ret->is_error;
+
+			$ret->normalize();
 		}
 
 		return $ret;
@@ -120,20 +101,18 @@ sub eval {
 
 		if ($input->{type} eq 'attributeset'){
 
-			my $out = $self->ret('attributeset', {});
+			my $out = $self->ret('attributeset', []);
 
-			for my $key(%{$input->{value}}){
+			for my $attr(@{$input->{value}}){
 
-				$out->{value}->{$key} = $input->{value}->{$key} if $key eq $self->{content};
+				push @{$out->{value}}, $attr if $attr->{name} eq $self->{content};
+
 			}
 
 			return $out;
 		}
 
-		print Dumper $input;		
-
-		# filter by name here
-		die "filter by name $self->{content} on input $input->{type}";
+		return $self->ret('Error', "filter by name $self->{content} on input $input->{type}");
 
 
 	}elsif ($self->{type} eq 'NodeTypeTest'){
@@ -142,23 +121,16 @@ sub eval {
 			if ($input->{type} eq 'nodeset'){
 				return $input;
 			}else{
-				die "can't filter node() on a non-nodeset value.";
+				return $self->ret('Error', "can't filter node() on a non-nodeset value.");
 			}
 		}
 
-		die "NodeTypeTest with an unknown filter ($self->{content})";
-		die Dumper $self;
+		return $self->ret('Error', "NodeTypeTest with an unknown filter ($self->{content})");
 
 
 	}elsif ($self->{type} eq 'Predicate'){
 
 		my $expr = $self->{tokens}->[0];
-		my $type = $expr->get_return_type;
-
-		unless( ($type eq 'number') || ($type eq 'boolean') || ($type eq 'attributeset')){
-
-			return $self->ret('Error', "A predicate's child expression must return a number or boolean, not a '$type'.");
-		}
 
 		my $out = $self->ret('nodeset', []);
 		my $i = 1;
@@ -186,7 +158,7 @@ sub eval {
 
 			}elsif ($ret->{type} eq 'attributeset'){
 
-				if (scalar keys %{$ret->{value}}){
+				if (scalar @{$ret->{value}}){
 					push @{$out->{value}}, $child;
 				}
 
@@ -195,7 +167,7 @@ sub eval {
 				return $ret;
 
 			}else{
-				die("unexpected predicate result type ($ret->{type})");
+				return $self->ret('Error', "unexpected predicate result type ($ret->{type})");
 			}
 
 			delete $child->{proximity_position};
@@ -230,15 +202,35 @@ sub eval {
 
 		my $v1 = $self->{tokens}->[0]->eval($input);
 		my $v2 = $self->{tokens}->[1]->eval($input);
-		my $types = $v1->{type}.'/'.$v2->{type};
+		my $t = "$v1->{type}/$v2->{type}";
 
-		if ($types eq 'nodeset/nodeset'){
+		return $v1 if $v1->is_error;
+		return $v2 if $v2->is_error;
 
-			die "need to compare two nodesets in string mode";
-
+		if ($v1->{type} > $v2->{type}){
+			$t = "$v2->{type}/$v1->{type}";
+			($v1, $v2) = ($v2, $v1);
 		}
 
-		die "can't do an EqualityExpr on $types";
+		if ($t eq 'attributeset/string'){
+
+			for my $attr(@{$v1->{value}}){;
+
+				my $v1_s = $self->ret('attribute', $attr)->get_string;
+				my $ok = $self->compare_op($self->{content}, $v1_s, $v2);
+
+				return $self->ret('boolean', 1) if $ok;
+			}
+
+			return $self->ret('boolean', 0);
+		}
+
+		if ($t eq 'string/string'){
+
+			return $self->ret('boolean',  $self->compare_op($self->{content}, $v1, $v2));
+		}
+
+		return $self->ret('Error', "can't do an EqualityExpr on $t");
 
 	}elsif ($self->{type} eq 'Literal'){
 
@@ -322,14 +314,14 @@ sub _axis_descendant_single {
 sub _axis_attribute {
 	my ($self, $input) = @_;
 
-	my $out = $self->ret('attributeset', {});
+	my $out = $self->ret('attributeset', []);
 
-	die "attribute axis can only filter single node (not a $input->{type})" unless $input->{type} eq 'node';
+	return $self->ret('Error', "attribute axis can only filter single node (not a $input->{type})") unless $input->{type} eq 'node';
 
 	my $node = $input->{value};
 
 	for my $key(keys %{$node->{attributes}}){
-		$out->{value}->{$key} = $node->{attributes}->{$key};
+		push @{$out->{value}}, { 'name' => $key, 'value' => $node->{attributes}->{$key} };
 	}
 
 	return $out;
@@ -339,8 +331,10 @@ sub get_function_handler {
 	my ($self, $function) = @_;
 
 	my $function_map = {
-		'last'	=> 'function_last',
-		'not'	=> 'function_not',
+		'last'			=> 'function_last',
+		'not'			=> 'function_not',
+		'normalize-space'	=> 'function_normalize_space',
+		'count'			=> 'function_count',
 	};
 
 	return $function_map->{$function} if defined $function_map->{$function};
@@ -357,14 +351,68 @@ sub function_last {
 sub function_not {
 	my ($self, $input, $args) = @_;
 
-	die "not() needs an argument" unless 1 == scalar @{$args};
+	return $self->ret('Error', "not() needs an argument") unless 1 == scalar @{$args};
 
 	my $ret = $args->[0]->eval($input);
+	return $ret if $ret->is_error;
+
 	my $out = $ret->get_boolean;
 
 	$out->{value} = !$out->{value};
 
 	return $out
+}
+
+sub function_normalize_space {
+	my ($self, $input, $args) = @_;
+
+	my $value;
+
+	if (scalar @{$args}){
+		my $out = $args->[0]->eval($input);
+		return $out if $out->is_error;
+
+		$value = $out->get_string->{value};
+	}else{
+		$value = $input->get_string->{value};
+	}
+
+	$value =~ s!^[\x20\x09\x0d\x0a]+!!;
+	$value =~ s![\x20\x09\x0d\x0a]+$!!;
+	$value =~ s![\x20\x09\x0d\x0a]+! !g;
+
+	return $self->ret('string', $value);
+}
+
+sub function_count {
+	my ($self, $input, $args) = @_;
+
+	print Dumper $input;
+	print Dumper $args;
+	die;
+
+	return $self->ret('Error', 'count() requires a single argument') unless 1 == scalar @{$args};
+
+	my $out = $args->[0]->eval($input);
+
+	return $self->ret('number', scalar($out->{value})) if $out->{type} eq 'nodeset';
+	return $self->ret('number', scalar($out->{value})) if $out->{type} eq 'attributeset';
+
+	return $self->ret('Error', 'count() requires a nodeset argument');
+}
+
+sub compare_op {
+	my ($self, $op, $a1, $a2) = @_;
+
+	if ($a1->{type} eq 'string'){
+		if ($op eq '='){
+			return ($a1->{value} eq $a2->{value}) ? 1 : 0;
+		}else{
+			return ($a1->{value} ne $a2->{value}) ? 1 : 0;
+		}
+	}
+
+	return $self->ret('Error', "compare $op one type $a1->{type}");
 }
 
 package XML::Parser::Lite::Tree::XPath::Token::Ret;
@@ -378,6 +426,7 @@ package XML::Parser::Lite::Tree::XPath::Token::Ret;
 # nodeset
 # attributeset
 # node
+# attribute
 #
 
 sub new {
@@ -428,7 +477,7 @@ sub get_boolean {
 	}
 
 	if ($self->{type} eq 'attributeset'){
-		return $self->ret('boolean', scalar(keys %{$self->{value}}) > 0);
+		return $self->ret('boolean', scalar(@{$self->{value}}) > 0);
 	}
 
 	die "$self->{value}" if $self->{type} eq 'Error';
@@ -442,11 +491,24 @@ sub get_string {
 	return $self if $self->{type} eq 'string';
 
 	if ($self->{type} eq 'nodeset'){
-		return $self->ret('string', '') unless scalar @{$self->{tokens}};
+		return $self->ret('string', '') unless scalar @{$self->{value}};
 
-		my $node = $self->ret('node', $self->{tokens}->[0]);
+		my $node = $self->ret('node', $self->{value}->[0]);
 
 		return $node->get_string;
+	}
+
+	if ($self->{type} eq 'attributeset'){
+
+		return $self->ret('string', '') unless scalar @{$self->{value}};
+
+		my $node = $self->ret('attribute', $self->{value}->[0]);
+
+		return $node->get_string;
+	}
+
+	if ($self->{type} eq 'attribute'){
+		return $self->ret('string', $self->{value}->{value});
 	}
 
 	die "can't convert type $self->{type} to string";
