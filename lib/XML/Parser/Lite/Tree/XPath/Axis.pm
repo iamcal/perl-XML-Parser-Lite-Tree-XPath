@@ -95,7 +95,7 @@ sub _axis_descendant_single {
 sub _axis_attribute {
 	my ($self, $input) = @_;
 
-	my $out = $self->ret('attributeset', []);
+	my $out = $self->ret('nodeset', []);
 	my $node = undef;
 
 	if ($input->{type} eq 'nodeset'){
@@ -109,7 +109,7 @@ sub _axis_attribute {
 	return $self->ret('Error', "attribute axis can only filter single node (not a $input->{type})") unless defined $node;
 
 	for my $key(keys %{$node->{attributes}}){
-		push @{$out->{value}}, { 'name' => $key, 'value' => $node->{attributes}->{$key} };
+		push @{$out->{value}}, { 'name' => $key, 'value' => $node->{attributes}->{$key}, 'type' => 'attribute' };
 	}
 
 	return $out;

@@ -1,0 +1,51 @@
+/aaa
+/aaa/ccc
+/aaa/ddd/bbb
+//bbb
+//ddd/bbb
+/aaa/ccc/ddd/*
+/*/*/*/bbb
+//*
+/aaa/bbb[1]
+/aaa/bbb[last()]
+//bbb[@id]
+//bbb[@name]
+//bbb[@*]
+//bbb[not(@*)]
+//bbb[@id='b1']
+//bbb[@name='bbb']
+//bbb[normalize-space(@name)='bbb']
+//*[count(bbb)=2]
+//*[count(*)=2]
+//*[count(*)=3]
+//*[name()='bbb']
+//*[starts-with(name(),'b')]
+//*[string-length(name()) = 3]
+//*[string-length(name()) < 3]
+//*[string-length(name()) > 3]
+//ccc | //bbb
+/aaa/eee | //bbb
+/aaa/eee | //ddd/ccc | /aaa | //bbb
+/aaa
+/child::aaa
+/aaa/bbb
+/child::aaa/child::bbb
+/child::aaa/bbb
+/descendant::*
+//ddd/parent::*
+/*/*/parent::*
+/aaa/bbb/ddd/ccc/eee/ancestor::*
+//fff/ancestor::*
+/aaa/bbb/following-sibling::*
+//ccc/following-sibling::*
+/aaa/xxx/preceding-sibling::*
+//ccc/preceding-sibling::*
+/aaa/xxx/following::*
+/aaa/xxx/preceding::*
+/aaa/xxx/descendant-or-self::*
+/aaa/xxx/ddd/eee/ancestor-or-self::*
+//ggg/self::*
+//bbb[position() mod 2 = 0 ]
+//bbb[ position() = floor(last-id() div 2 + 0.5) or position() = ceiling(last-id() div 2 + 0.5) ]
+//ccc[ position() = floor(last-id() div 2 + 0.5) or position() = ceiling(last-id() div 2 + 0.5) ]
+"test""test\"test""test\\"foo

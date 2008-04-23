@@ -120,22 +120,14 @@ sub eval {
 			my $out = $self->ret('nodeset', []);
 
 			for my $tag(@{$context->{value}}){
+
 				if (($tag->{'type'} eq 'tag') && ($tag->{'name'} eq $self->{content})){
 					push @{$out->{value}}, $tag;
 				}
-			}
 
-			return $out;
-		}
-
-		if ($context->{type} eq 'attributeset'){
-
-			my $out = $self->ret('attributeset', []);
-
-			for my $attr(@{$context->{value}}){
-
-				push @{$out->{value}}, $attr if $attr->{name} eq $self->{content};
-
+				if (($tag->{'type'} eq 'attribute') && ($tag->{'name'} eq $self->{content})){
+					push @{$out->{value}}, $tag;
+				}
 			}
 
 			return $out;
@@ -185,7 +177,7 @@ sub eval {
 					push @{$out->{value}}, $child;
 				}
 
-			}elsif ($ret->{type} eq 'attributeset'){
+			}elsif ($ret->{type} eq 'nodeset'){
 
 				if (scalar @{$ret->{value}}){
 					push @{$out->{value}}, $child;
@@ -281,14 +273,16 @@ sub eval {
 			($v1, $v2) = ($v2, $v1);
 		}
 
-		if ($t eq 'attributeset/string'){
+		if ($t eq 'nodeset/string'){
 
-			for my $attr(@{$v1->{value}}){;
+			for my $node(@{$v1->{value}}){;
 
-				my $v1_s = $self->ret('attribute', $attr)->get_string;
+				my $v1_s = $self->ret('node', $node)->get_string;
+				return $v1_s if $v1_s->is_error;
+
 				my $ok = $self->compare_op($self->{content}, $v1_s, $v2);
-
 				return $ok if $ok->is_error;
+
 				return $ok if $ok->{value};
 			}
 
@@ -483,7 +477,8 @@ sub function_count {
 	my $subject = $args->[0];
 
 	return $self->ret('number', scalar(@{$subject->{value}})) if $subject->{type} eq 'nodeset';
-	return $self->ret('number', scalar(@{$subject->{value}})) if $subject->{type} eq 'attributeset';
+
+	die("can't perform count() on $subject->{type}");
 }
 
 sub function_name {
