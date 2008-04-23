@@ -4,5 +4,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
 	'NAME'		=> 'XML::Parser::Lite::Tree::XPath',
 	'VERSION_FROM'	=> 'lib/XML/Parser/Lite/Tree/XPath.pm',
-	'PREREQ_PM'	=> {},
+	'PREREQ_PM'	=> {
+		Test::More	=> 0,
+	},
 );

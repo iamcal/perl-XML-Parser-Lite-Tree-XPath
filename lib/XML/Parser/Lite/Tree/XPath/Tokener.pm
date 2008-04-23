@@ -118,8 +118,11 @@ sub step {
 
 	if ($self->{input} =~ m!^(('[^']*')|("[^']*"))!){
 
+		my $inner = $1;
+		$inner =~ m!^.(.*).$!;
+
 		$self->push_token('Literal', $1);
-		$self->consume(length $1);
+		$self->consume(2 + length $1);
 		return;
 	}
 
@@ -240,7 +243,7 @@ sub special_rules {
 
 			if (defined $token->{next}){
 
-				if ($token->match('Symbol', '(')){
+				if ($token->{next}->match('Symbol', '(')){
 
 					if ($self->is_NodeType($token->{content})){
 
