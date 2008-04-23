@@ -5,12 +5,13 @@ use XML::Parser::Lite::Tree::XPath::Tokener;
 use XML::Parser::Lite::Tree::XPath::Tree;
 use XML::Parser::Lite::Tree::XPath::Eval;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 # v0.10 - tokener finished
 # v0.11 - tree builder started
 # v0.12 - tree builder can tree all zvon examples correctly (t/04_tree2.t)
 # v0.14 - started on the eval engine - zvon examples 1 and 2 eval correctly (t/05_zvon0[12].t)
+# v0.15 - more eval engine work - zvon examples 3,4,5 and some of 6
 
 sub new {
 	my $class = shift;

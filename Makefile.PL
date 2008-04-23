@@ -6,5 +6,6 @@ WriteMakefile(
 	'VERSION_FROM'	=> 'lib/XML/Parser/Lite/Tree/XPath.pm',
 	'PREREQ_PM'	=> {
 		Test::More	=> 0,
+		XML::Parser::Lite::Tree	=> 0,
 	},
 );

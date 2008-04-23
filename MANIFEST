@@ -10,3 +10,10 @@ lib/XML/Parser/Lite/Tree/XPath/Eval.pm
 t/01_use.t
 t/02_tokener.t
 t/03_tree.t
+t/04_tree2.t
+t/05_zvon_01.t
+t/05_zvon_02.t
+t/05_zvon_03.t
+t/05_zvon_04.t
+t/05_zvon_05.t
+t/05_zvon_06.t
