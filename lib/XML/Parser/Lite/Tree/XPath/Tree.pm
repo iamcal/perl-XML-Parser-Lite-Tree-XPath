@@ -21,11 +21,92 @@ sub build_tree {
 	#
 
 	return 0 unless $self->make_groups();
+	$self->recurse_before($self, 'del_links');
+
+
+	#
+	# simple groupings
+	#
+
 	return 0 unless $self->recurse_before($self, 'clean_axis_and_abbreviations');
 	return 0 unless $self->recurse_before($self, 'claim_groups');
 	return 0 unless $self->recurse_after($self, 'build_steps');
+	return 0 unless $self->recurse_after($self, 'build_paths');
+
+
+	#
+	# get operator oprands
+	#
+
+	return 0 unless $self->binops(['|'], 'UnionExpr');
+	# TODO: unary ops here
+	return 0 unless $self->binops(['*','div','mod'], 'MultiplicativeExpr');
+	return 0 unless $self->binops(['+','-'], 'AdditiveExpr');
+	return 0 unless $self->binops(['<','<=','>','>='], 'RelationalExpr');
+	return 0 unless $self->binops(['=','!='], 'EqualityExpr');
+	return 0 unless $self->binops(['and'], 'AndExpr');
+	return 0 unless $self->binops(['or'], 'OrExpr');
+
+	#return 0 unless $self->find_expressions(['UnionExpr', 'MultiplicativeExpr', 'AdditiveExpr', 'RelationalExpr', 'EqualityExpr', 'AndExpr', 'OrExpr']);
+
 
 	return 1;
+}
+
+sub dump_flat {
+	my ($self) = @_;
+	$self->{dump} = '';
+
+	for my $token(@{$self->{tokens}}){
+		$self->dump_flat_go($token);
+	}
+
+	my $dump = $self->{dump};
+	delete $self->{dump};
+	return $dump;
+}
+
+sub dump_flat_go {
+	my ($self, $node) = @_;
+
+	$self->{dump} .= '['.$node->dump();
+
+	for my $token(@{$node->{tokens}}){
+
+		$self->dump_flat_go($token);
+	}
+
+	$self->{dump} .= ']';
+}
+
+sub dump_tree {
+	my ($self) = @_;
+	$self->{dump} = '';
+	$self->{indent} = [''];
+
+	for my $token(@{$self->{tokens}}){
+		$self->dump_tree_go($token);
+	}
+
+	my $dump = $self->{dump};
+	delete $self->{dump};
+	delete $self->{indent};
+	return $dump;
+}
+
+sub dump_tree_go {
+	my ($self, $node) = @_;
+
+	$self->{dump} .= @{$self->{indent}}[-1].$node->dump()."\n";
+
+	push @{$self->{indent}}, @{$self->{indent}}[-1].' - ';
+
+	for my $token(@{$node->{tokens}}){
+
+		$self->dump_tree_go($token);
+	}
+
+	pop @{$self->{indent}};
 }
 
 sub make_groups {
@@ -111,6 +192,19 @@ sub recurse_after {
 	return 1;
 }
 
+sub binops {
+	my ($self, $ops, $production) = @_;
+	$self->{binops} = $ops;
+	$self->{binop_production} = $production;
+
+	my $ret = $self->recurse_after($self, 'do_binops');
+
+	delete $self->{binops};
+	delete $self->{binop_production};
+
+	return $ret;
+}
+
 sub claim_groups {
 	my ($self, $root) = @_;
 
@@ -185,18 +279,21 @@ sub claim_groups {
 
 			return 0 unless $self->claim_groups($next);
 
+
 			#
 			# organise it into an arg list
 			#
 
 			return 0 unless $self->make_arg_list($token, $next);
+			
+
 
 			push @{$root->{tokens}}, $token;
 
 
 		}elsif ($token->match('Group()')){
 
-			$token->{type} = 'Expression';
+			$token->{type} = 'PrimaryExpr';
 
 			push @{$root->{tokens}}, $token;
 
@@ -227,7 +324,12 @@ sub make_arg_list {
 
 		if ($token->match('Symbol', ',')){
 
-			push @{$root->{args}}, $arg;
+			push @{$root->{tokens}}, $arg;
+
+			$arg = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$arg->{type} = 'FunctionArg';
+			$arg->{tokens} = [];
+
 		}else{
 
 			$token->{parent} = $arg;
@@ -262,7 +364,6 @@ sub clean_axis_and_abbreviations {
 			}
 
 			$token->{type} = 'AxisSpecifier';
-			$token->{content} .= '::';
 
 			push @{$root->{tokens}}, $token;
 
@@ -270,7 +371,7 @@ sub clean_axis_and_abbreviations {
 		}elsif ($token->match('Symbol', '@')){
 
 			$token->{type} = 'AxisSpecifier';
-			$token->{content} = 'attribute::';
+			$token->{content} = 'attribute';
 
 			push @{$root->{tokens}}, $token;
 
@@ -279,23 +380,23 @@ sub clean_axis_and_abbreviations {
 
 			# // == /descendant-or-self::node()/
 
-			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
-			$token->{type} = 'Symbol';
+			$token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$token->{type} = 'Operator';
 			$token->{content} = '/';
 			push @{$root->{tokens}}, $token;
 
-			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
 			$token->{type} = 'AxisSpecifier';
-			$token->{content} = 'descendant-or-self::';
+			$token->{content} = 'descendant-or-self';
 			push @{$root->{tokens}}, $token;
 
-			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
 			$token->{type} = 'NodeTypeTest';
 			$token->{content} = 'node';
 			push @{$root->{tokens}}, $token;
 
-			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
-			$token->{type} = 'Symbol';
+			$token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$token->{type} = 'Operator';
 			$token->{content} = '/';
 			push @{$root->{tokens}}, $token;
 
@@ -304,7 +405,7 @@ sub clean_axis_and_abbreviations {
 
 			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
 			$token->{type} = 'AxisSpecifier';
-			$token->{content} = 'self::';
+			$token->{content} = 'self';
 			push @{$root->{tokens}}, $token;
 
 			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
@@ -317,7 +418,7 @@ sub clean_axis_and_abbreviations {
 
 			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
 			$token->{type} = 'AxisSpecifier';
-			$token->{content} = 'parent::';
+			$token->{content} = 'parent';
 			push @{$root->{tokens}}, $token;
 
 			my $token = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
@@ -418,11 +519,149 @@ sub build_steps {
 	return 1;
 }
 
-sub expression_binops {
-
+sub build_paths {
 	my ($self, $root) = @_;
 
+	my $tokens = $root->{tokens};
+	$root->{tokens} = [];
+
+	while(my $token = shift @{$tokens}){
+
+		if ($token->match('Step')){
+
+			my $path = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$path->{type} = 'LocationPath';
+			$path->{absolute} = 0;
+			$path->{tokens} = [$token];
+
+			return 0 unless $self->slurp_path($path, $tokens);
+
+			push @{$root->{tokens}}, $path;	
+
+		}elsif ($token->match('Operator', '/')){
+
+			unshift @{$tokens}, $token;
+
+			my $path = XML::Parser::Lite::Tree::XPath::Tokener::Token->new();
+			$path->{type} = 'LocationPath';
+			$path->{absolute} = 1;
+			$path->{tokens} = [];
+
+			return 0 unless $self->slurp_path($path, $tokens);
+
+			unless (scalar @{$path->{tokens}}){
+				$self->{error} = "Slash found at end of path.";
+				return 0;
+			}
+
+			push @{$root->{tokens}}, $path;
+
+		}else{
+
+			push @{$root->{tokens}}, $token;
+		}
+	}
+
+	return 1;
+}
+
+sub slurp_path {
+	my ($self, $path, $tokens) = @_;
+
+	while(1){
+
+		my $t1 = shift @{$tokens};
+
+		if (defined $t1){
+			if ($t1->match('Operator', '/')){
+
+				my $t2 = shift @{$tokens};
+
+				if (defined $t2){
+					if ($t2->match('Step')){
+
+						push @{$path->{tokens}}, $t2;
+					}else{
+						$self->{error} = "Non Step token ($t2->{type}) found after slash.";
+						return 0;
+					}
+				}else{
+					$self->{error} = "Slash found at end of path.";
+					return 0;
+				}
+			}else{
+				unshift @{$tokens}, $t1;
+				return 1;
+			}
+		}else{
+			return 1;
+		}
+	}
+}
+
+sub do_binops {
+	my ($self, $root) = @_;
+
+	my $tokens = $root->{tokens};
+	$root->{tokens} = [];
+
+	while(my $token = shift @{$tokens}){
+
+
+		for my $op(@{$self->{binops}}){
+		
+			if ($token->match('Operator', $op)){
+
+				if (!scalar(@{$root->{tokens}})){
+					$self->{error} = "Found a binop $token->{content} with no preceeding token";
+					return 0;
+				}
+
+				if (!scalar(@{$tokens})){
+					$self->{error} = "Found a binop $token->{content} with no following token";
+					return 0;
+				}
+
+				my $prev = pop @{$root->{tokens}};
+				my $next = shift @{$tokens};
+
+				push @{$token->{tokens}}, $prev;
+				push @{$token->{tokens}}, $next;
+				$token->{type} = $self->{binop_production};
+
+				last;
+			}
+		}
+
+		push @{$root->{tokens}}, $token;
+	}
+
 	return 1;	
+}
+
+sub add_links {
+	my ($self, $root) = @_;
+
+	my $prev = undef;
+
+	for my $token(@{$root->{tokens}}){
+
+		$token->{prev} = $prev;
+		$prev->{next} = $token if defined $prev;
+
+		$prev = $token;
+	}
+}
+
+sub del_links {
+	my ($self, $root) = @_;
+
+	for my $token(@{$root->{tokens}}){
+
+		delete $token->{parent};
+		delete $token->{prev};
+		delete $token->{next};
+	}
 }
 
 1;

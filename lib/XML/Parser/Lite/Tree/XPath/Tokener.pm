@@ -404,6 +404,17 @@ sub match {
 	return 1;
 }
 
+sub dump {
+	my ($self) = @_;
+
+	my $ret = $self->{type};
+	$ret .= ':absolute' if $self->{absolute};
+	$ret .= ':'.$self->{content} if defined $self->{content};
+	$ret .= $self->{axis} if defined $self->{axis};
+
+	return $ret;
+}
+
 package XML::Parser::Lite::Tree::XPath::Tokener::Rx;
 
 sub fetch {

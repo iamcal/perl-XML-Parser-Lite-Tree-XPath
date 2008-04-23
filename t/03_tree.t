@@ -18,7 +18,7 @@ test_tree("text 'foo'");
 
 
 #use Data::Dumper;
-#print Dumper test_tree('../title[]');
+#print Dumper test_tree('/foo/bar/baz');
 
 
 sub test_tree {
