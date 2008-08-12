@@ -10,8 +10,9 @@ use Data::Dumper;
 # number	- value is numeric scalar
 # boolean	- value is boolean scalar
 # string	- value is string scalar
-# nodeset	- value is arrayref of nodes
+# nodeset	- value is arrayref of nodes and/or attributes
 # node		- value is node
+# attribute	- value is attribute
 #
 
 sub new {
@@ -36,7 +37,11 @@ sub normalize {
 
 		# uniquify and sort
 		my %seen = ();
-		my @tags =  sort { $a->{order} <=> $b->{order} } grep { ! $seen{$_->{order}} ++ } @{$self->{value}};
+		my @tags =  sort {
+			$a->{order} <=> $b->{order}
+		} grep {
+			! $seen{$_->{order}} ++
+		} @{$self->{value}};
 
 		$self->{value} = \@tags;
 	}
