@@ -108,8 +108,15 @@ sub _axis_attribute {
 
 	return $self->ret('Error', "attribute axis can only filter single node (not a $input->{type})") unless defined $node;
 
+	my $i = 0;
+
 	for my $key(keys %{$node->{attributes}}){
-		push @{$out->{value}}, { 'name' => $key, 'value' => $node->{attributes}->{$key}, 'type' => 'attribute' };
+		push @{$out->{value}}, {
+			'name'	=> $key,
+			'value'	=> $node->{attributes}->{$key},
+			'type'	=> 'attribute',
+			'order'	=> ($node->{order} * 10000000) + $i++,
+		};
 	}
 
 	return $out;
