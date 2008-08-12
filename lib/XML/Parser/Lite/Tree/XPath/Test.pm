@@ -38,7 +38,7 @@ sub test_tree {
 	if (!$tree->build_tree($tokener->{tokens})){
 		print "Path: $path\n";
 		print "Failed tree: ($tree->{error})\n";
-		print Dumper $tree;
+		#print Dumper $tree;
 		ok(0);
 		return;
 	}
@@ -94,7 +94,7 @@ sub test_nodeset {
 
 			}elsif ($key eq 'type'){
 
-				$ok = $nodes->[$i]->{type} == $xnode->{$key};
+				$ok = $nodes->[$i]->{type} eq $xnode->{$key};
 
 			}else{
 				$ok = $nodes->[$i]->{attributes}->{$key} eq $xnode->{$key};
