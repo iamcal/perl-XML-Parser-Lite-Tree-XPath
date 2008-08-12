@@ -268,7 +268,7 @@ sub eval {
 		return $v1 if $v1->is_error;
 		return $v2 if $v2->is_error;
 
-		if ($v1->{type} > $v2->{type}){
+		if ($v1->{type} gt $v2->{type}){
 			$t = "$v2->{type}/$v1->{type}";
 			($v1, $v2) = ($v2, $v1);
 		}
