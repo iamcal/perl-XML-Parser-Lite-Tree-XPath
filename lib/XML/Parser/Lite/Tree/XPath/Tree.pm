@@ -403,12 +403,12 @@ sub clean_axis_and_abbreviations {
 
 		}elsif ($token->match('Symbol', '.')){
 
-			my $token = XML::Parser::Lite::Tree::XPath::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'AxisSpecifier';
 			$token->{content} = 'self';
 			push @{$root->{tokens}}, $token;
 
-			my $token = XML::Parser::Lite::Tree::XPath::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'NodeTypeTest';
 			$token->{content} = 'node';
 			push @{$root->{tokens}}, $token;
@@ -416,12 +416,12 @@ sub clean_axis_and_abbreviations {
 
 		}elsif ($token->match('Symbol', '..')){
 
-			my $token = XML::Parser::Lite::Tree::XPath::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'AxisSpecifier';
 			$token->{content} = 'parent';
 			push @{$root->{tokens}}, $token;
 
-			my $token = XML::Parser::Lite::Tree::XPath::Token->new();
+			$token = XML::Parser::Lite::Tree::XPath::Token->new();
 			$token->{type} = 'NodeTypeTest';
 			$token->{content} = 'node';
 			push @{$root->{tokens}}, $token;
