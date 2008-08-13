@@ -1,4 +1,4 @@
-use Test::More tests => 14;
+use Test::More tests => 17;
 
 use lib 'lib';
 use strict;
@@ -40,12 +40,9 @@ test_nodeset(
 	]
 );
 
-__END__
-
 test_nodeset(
 	'//ccc[ position() = floor(last() div 2 + 0.5) or position() = ceiling(last() div 2 + 0.5) ]',
 	[
-		{'nodename' => 'ccc', 'id' => 'c1'},
 		{'nodename' => 'ccc', 'id' => 'c2'},
 	]
 );
