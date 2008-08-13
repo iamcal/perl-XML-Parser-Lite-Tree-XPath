@@ -38,6 +38,8 @@ test_nodeset(
 	]
 );
 
+# this test doesn't appear on zvon any more...
+
 test_nodeset(
 	'/*/*/parent::*',
 	[
