@@ -38,3 +38,4 @@ t/05_zvon_21.t
 t/05_zvon_22.t
 t/06_expr.t
 t/07_cover_token.t
+t/08_functions_01_number.t
