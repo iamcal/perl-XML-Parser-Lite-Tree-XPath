@@ -233,6 +233,7 @@ sub eval {
 				$value = $out->get_number if $sig eq 'number';
 				$value = $out->get_nodeset if $sig eq 'nodeset';
 				$value = $out->get_boolean if $sig eq 'boolean';
+				$value = $out if $sig eq 'any';
 
 				return $self->ret('Error', "Can't coerce a function argument into a '$sig'") unless defined $value;
 				return $value if $value->is_error;
@@ -400,9 +401,9 @@ sub get_function_handler {
 		'last'			=> [\&function_last,		''			],
 		'position'		=> [\&function_position,	''			],
 		'count'			=> [\&function_count,		'nodeset'		],
-		'id'			=> [undef,			'any'			],
-		'local-name'		=> [undef,			'nodeset?'		],
-		'namespace-uri'		=> [undef,			'nodeset?'		],
+		'id'			=> [\&function_id,		'any'			],
+		'local-name'		=> [\&function_local_name,	'nodeset?'		],
+		'namespace-uri'		=> [\&function_namespace_uri,	'nodeset?'		],
 		'name'			=> [\&function_name,		'nodeset?'		],
 
 		# string functions
@@ -570,6 +571,160 @@ sub function_ceiling {
 	return $self->ret('number', $ret);
 }
 
+sub function_id {
+	my ($self, $args) = @_;
+
+	unless ($self->{context}->{type} eq 'node' || $self->{context}->{type} eq 'nodeset'){
+
+		return $self->ret('Error', "Can only call id() in a node or nodeset context - not $self->{context}->{type}");
+	}
+
+	my $obj = $args->[0];
+	my $ids = '';
+
+	if ($obj->{type} eq 'nodeset'){
+
+		for my $node(@{$obj->{value}}){
+
+			$ids .= ' ' . $self->get_string_value($node);
+		}
+	}else{
+		$ids = $obj->get_string->{value};
+	}
+
+	$ids =~ s!^\s*(.*?)\s*$!$1!;
+
+	$self->ret('nodeset', []) unless length $ids;
+
+	my @ids = split /[ \t\r\n]+/, $ids;
+
+
+	#
+	# we have a list of IDs to search for - now traverse the whole document,
+	# checking every element node
+	#
+
+	my $root = {};
+
+	if ($self->{context}->{type} eq 'nodeset'){
+		$root = $self->{context}->{value}->[0];
+	}
+	if ($self->{context}->{type} eq 'node'){
+		$root = $self->{context}->{value};
+	}
+
+	$root = $root->{parent} while defined $root->{parent};
+
+	my $out = $self->_recurse_find_id($root, \@ids);
+
+	return $self->ret('nodeset', $out);
+}
+
+sub _recurse_find_id {
+	my ($self, $node, $ids) = @_;
+
+	my $out = [];
+
+	#
+	# is it a match?
+	#
+
+	if ($node->{type} eq 'tag' && length $node->{uid}){
+
+		for my $id (@{$ids}){
+			if ($id eq $node->{uid}){
+				push @{$out}, $node;
+				last;
+			}
+		}
+	}
+
+
+	#
+	# do we need to recurse?
+	#
+
+	if ($node->{type} eq 'tag' || $node->{type} eq 'root'){
+
+		for my $child (@{$node->{children}}){
+
+			my $more = $self->_recurse_find_id($child, $ids);
+
+			for my $match (@{$more}){
+
+				push @{$out}, $match;
+			}
+		}
+	}
+
+	return $out;
+}
+
+sub function_local_name {
+	my ($self, $args) = @_;
+
+	my $node = $self->_get_first_node_by_doc_order($args);
+
+	return $node if $node->{type} eq 'Error';
+
+	return $self->ret('string', $node->{local_name}) if defined $node->{local_name};
+	return $self->ret('string', $node->{name}) if defined $node->{name};
+	return $self->ret('string', '');
+}
+
+sub function_namespace_uri {
+	my ($self, $args) = @_;
+
+	my $node = $self->_get_first_node_by_doc_order($args);
+
+	return $node if $node->{type} eq 'Error';
+
+	return $self->ret('string', defined $node->{ns} ? $node->{ns} : '');
+}
+
+sub _get_first_node_by_doc_order {
+	my ($self, $args) = @_;
+
+
+	#
+	# for no args, take the first node in the context nodeset
+	#
+
+	unless (defined $args->[0]){
+
+		return $self->{context}->{value} if $self->{context}->{type} eq 'node';
+		return $self->{context}->{value}->[0] if $self->{context}->{type} eq 'nodeset';
+
+		return $self->ret('Error', "If argument is ommitted, context must be node or nodeset - not $self->{context}->{type}");
+	}
+
+
+	#
+	# we have a nodeset arg - return the node with the lowest doc order
+	#
+
+	return $args->[0]->{value} if $args->[0]->{type} eq 'node';
+
+	if ($args->[0]->{type} eq 'nodeset'){
+
+		my $min = $self->{max_order} + 1;
+		my $low = undef;
+
+		for my $node (@{$args->[0]->{value}}){
+
+			if ($node->{order} < $min){
+
+				$min = $node->{order};
+				$low = $node;
+			}
+		}
+
+		return $low;
+	}
+
+	return $self->ret('Error', "Argument to fucntion isn't expected node/nodeset");
+}
+
 sub simple_floor {
 	my ($self, $value) = @_;
 	return int $value;
@@ -617,6 +772,84 @@ sub op_div {
 	my ($self, $n1, $n2) = @_;
 
 	return $n1 / $n2;
+}
+
+sub get_string_value {
+	my ($self, $node) = @_;
+
+
+	if ($node->{type} eq 'tag'){
+
+		#
+		# The string-value of an element node is the concatenation of the string-values
+		# of all text node descendants of the element node in document order.
+		#
+
+		my $value = '';
+		for my $child (@{$node->{children}}){
+			if ($child->{type} eq 'tag'){
+				$value .= $self->get_string_value($child);
+			}
+			if ($child->{type} eq 'data'){
+				$value .= $self->get_string_value($child);
+			}
+		}
+		return $value;
+	}
+
+	if ($node->{type} eq 'attribute'){
+
+		#
+		# An attribute node has a string-value. The string-value is the normalized value
+		# as specified by the XML Recommendation [XML]. An attribute whose normalized value
+		# is a zero-length string is not treated specially: it results in an attribute node
+		# whose string-value is a zero-length string.
+		#
+	}
+
+	if ($node->{type} eq 'namespace'){
+
+		#
+		# The string-value of a namespace node is the namespace URI that is being bound to
+		# the namespace prefix; if it is relative, it must be resolved just like a namespace
+		# URI in an expanded-name.
+		#
+	}
+
+		#
+		# The string-value of a processing instruction node is the part of the processing
+		# instruction following the target and any whitespace. It does not include the
+		# terminating ?>.
+		#
+
+		#
+		# The string-value of comment is the content of the comment not including the
+		# opening <!-- or the closing -->.
+		#
+
+	if ($node->{type} eq 'data'){
+
+		#
+		# The string-value of a text node is the character data. A text node always has
+		# at least one character of data.
+		#
+
+		return $node->{content};
+	}
+
+	print "# we can't find a text-value for this node!\n";
+	print Dumper $node;
+
+	return '';
+}
+
+sub get_expanded_name {
+	my ($self, $node) = @_;
+
+	print "# we can't find an expanded name for this node!\n";
+	print Dumper $node;
+
+	return ['', ''];
 }
 
 1;
