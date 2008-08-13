@@ -1,4 +1,4 @@
-use Test::More tests => 51;
+use Test::More tests => 61;
 
 use lib 'lib';
 use strict;
@@ -62,6 +62,8 @@ test_nodeset(
 		{'nodename' => 'bbb', id => 'b2'},
 	]
 );
+test_number('count(//*)', 7);
+test_number('count(//bbb)', 3);
 
 
 #
@@ -163,4 +165,6 @@ test_string('namespace-uri(/aaa/*[3])', 'urn:foo');
 # The name function returns a string containing a QName representing the expanded-name of the node in the argument node-set that is first in document order.
 #
 
-
+test_string('name()', '');
+test_string('name(/aaa)', 'aaa');
+test_string('name(/aaa/*[3])', 'foo:bbb');
