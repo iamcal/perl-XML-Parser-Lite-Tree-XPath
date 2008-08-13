@@ -1,4 +1,4 @@
-use Test::More tests => 18;
+use Test::More tests => 25;
 
 use lib 'lib';
 use strict;
@@ -15,13 +15,13 @@ set_xml(q!
 	</aaa>
 !);
 
-#test_nodeset(
-#	'//@id',
-#	{
-#		'id'=>'b1'],
-#		['id','b2'],
-#	]
-#);
+test_nodeset(
+	'//@id',
+	[
+		{'nodename' => 'id', 'value' => 'b1', 'type' => 'attribute'},
+		{'nodename' => 'id', 'value' => 'b2', 'type' => 'attribute'},
+	]
+);
 
 test_nodeset(
 	'//bbb[@id]',
@@ -53,4 +53,3 @@ test_nodeset(
 		{'nodename' => 'bbb', 'attributecount' => 0},
 	]
 );
-
