@@ -89,20 +89,30 @@ sub test_nodeset {
 
 				$ok = $nodes->[$i]->{name} eq $xnode->{$key};
 
+				print "# node name - expected: $xnode->{$key}, got: $nodes->[$i]->{name}\n" unless $ok;
+
 			}elsif ($key eq 'attributecount'){
 
 				$ok = scalar(keys %{$nodes->[$i]->{attributes}}) == $xnode->{$key};
+
+				print "# attribute count - expected: $xnode->{$key}, got: ".scalar(keys %{$nodes->[$i]->{attributes}})."\n" unless $ok;
 
 			}elsif ($key eq 'type'){
 
 				$ok = $nodes->[$i]->{type} eq $xnode->{$key};
 
+				print "# node type - expected: $xnode->{$key}, got: $nodes->[$i]->{type}\n" unless $ok;
+
 			}elsif ($key eq 'value'){
 
 				$ok = $nodes->[$i]->{value} eq $xnode->{$key};
 
+				print "# value - expected: $xnode->{$key}, got: $nodes->[$i]->{value}\n" unless $ok;
+
 			}else{
 				$ok = $nodes->[$i]->{attributes}->{$key} eq $xnode->{$key};
+
+				print "# attribute $key - expected: $xnode->{$key}, got: $nodes->[$i]->{attributes}->{$key}\n" unless $ok;
 			}
 
 			$bad++ unless $ok;
@@ -113,9 +123,9 @@ sub test_nodeset {
 	}
 
 	if ($bad){
-		print "codes don't match. got:\n";
+		print "# codes don't match. got:\n";
 		for my $node(@{$nodes}){
-			print "\t";
+			print "# \t";
 			print "($node->{type} : $node->{order}) ";
 			print "$node->{name}";
 			for my $key(keys %{$node->{attributes}}){
@@ -123,16 +133,17 @@ sub test_nodeset {
 			}
 			print "\n";
 		}
-		print "expected:\n";
+		print "# expected:\n";
 		my $i = 1;
 		for my $node(@{$expected}){
-			print "\t$i";
+			print "# \t$i";
 			for my $key(keys %{$node}){
 				print ", $key={$node->{$key}}";
 			}
 			print "\n";
 			$i++;
 		}
+		print Dumper $nodes;
 	}
 }
 
