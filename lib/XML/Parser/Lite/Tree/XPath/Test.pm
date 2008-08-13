@@ -10,7 +10,7 @@ use Data::Dumper;
 
 require Exporter;
 @ISA    = qw(Exporter);
-@EXPORT = qw(set_xml test_tree test_nodeset test_number);
+@EXPORT = qw(set_xml test_tree test_nodeset test_number test_string);
 
 our $xpath;
 
@@ -77,6 +77,11 @@ sub test_nodeset {
 	my $ok = scalar(@{$nodes}) == scalar(@{$expected});
 	$bad++ unless $ok;
 	ok($ok);
+
+	if (!$ok){
+		print "# wrong node count. got ".scalar(@{$nodes}).", expected ".scalar(@{$expected})."\n";
+	}
+
 
 	my $i = 0;
 	for my $xnode(@{$expected}){
@@ -169,6 +174,32 @@ sub test_number {
 		}
 	}else{
 		print "got a $ret->{type} result\n";
+		ok(0);
+	}
+}
+
+sub test_string {
+	my ($path, $expected) = @_;
+
+	my $ret = $xpath->query($path);
+
+	if (!$ret){
+		print "Error: $xpath->{error}\n";
+		ok(0);
+		ok(0);
+		return;
+	}
+
+	ok($ret->{type} eq 'string');
+
+	if ($ret->{type} eq 'string'){
+		ok($ret->{value} eq $expected);
+
+		if ($ret->{value} ne $expected){
+			print "# expected $expected, got $ret->{value}\n";
+		}
+	}else{
+		print "# got a $ret->{type} result\n";
 		ok(0);
 	}
 }
