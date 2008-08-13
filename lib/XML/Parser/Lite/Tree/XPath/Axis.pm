@@ -96,27 +96,29 @@ sub _axis_attribute {
 	my ($self, $input) = @_;
 
 	my $out = $self->ret('nodeset', []);
-	my $node = undef;
+	my $nodes = [];
 
 	if ($input->{type} eq 'nodeset'){
-		$node = shift @{$input->{value}};
+		$nodes = $input->{value};
 	}
 
 	if ($input->{type} eq 'node'){
-		$node = $input->{value};
+		$nodes = [$input->{value}];
 	}
 
-	return $self->ret('Error', "attribute axis can only filter single node (not a $input->{type})") unless defined $node;
+	return $self->ret('Error', "attribute axis can only filter nodes and nodesets (not a $input->{type})") unless defined $nodes;
 
 	my $i = 0;
 
-	for my $key(keys %{$node->{attributes}}){
-		push @{$out->{value}}, {
-			'name'	=> $key,
-			'value'	=> $node->{attributes}->{$key},
-			'type'	=> 'attribute',
-			'order'	=> ($node->{order} * 10000000) + $i++,
-		};
+	for my $node(@{$nodes}){
+		for my $key(keys %{$node->{attributes}}){
+			push @{$out->{value}}, {
+				'name'	=> $key,
+				'value'	=> $node->{attributes}->{$key},
+				'type'	=> 'attribute',
+				'order'	=> ($node->{order} * 10000000) + $i++,
+			};
+		}
 	}
 
 	return $out;
