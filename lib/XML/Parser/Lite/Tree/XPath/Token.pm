@@ -482,30 +482,6 @@ sub function_count {
 	die("can't perform count() on $subject->{type}");
 }
 
-sub function_name {
-	my ($self, $args) = @_;
-
-	my $subject;
-
-	if (defined $args->[0]){
-		$subject = $args->[0]->eval($self->{context});
-		return $subject if $subject->is_error;
-	}else{
-		$subject = $self->{context};
-	}
-
-	return $self->ret('string', $subject->{value}->{name}) if ($subject->{type} eq 'node');
-
-	if ($subject->{type} eq 'nodeset'){
-		my $node = shift @{$subject->{value}};
-		
-		return $self->ret('string', $node->{name}) if defined $node;
-		return $self->ret('Error', "Can't perform name() on an empty nodeset");
-	}
-
-	return $self->ret('Error', "Can't perform name() function on a '$subject->{type}'");
-}
-
 sub function_starts_with {
 	my ($self, $args) = @_;
 
@@ -666,9 +642,11 @@ sub function_local_name {
 	my $node = $self->_get_first_node_by_doc_order($args);
 
 	return $node if $node->{type} eq 'Error';
+	return $self->ret('string', '') unless defined $node;
 
-	return $self->ret('string', $node->{local_name}) if defined $node->{local_name};
-	return $self->ret('string', $node->{name}) if defined $node->{name};
+	my $name = $self->get_expanded_name($node);
+
+	return return $self->ret('string', $name->{local}) if defined $name;
 	return $self->ret('string', '');
 }
 
@@ -678,8 +656,26 @@ sub function_namespace_uri {
 	my $node = $self->_get_first_node_by_doc_order($args);
 
 	return $node if $node->{type} eq 'Error';
+	return $self->ret('string', '') unless defined $node;
 
-	return $self->ret('string', defined $node->{ns} ? $node->{ns} : '');
+	my $name = $self->get_expanded_name($node);
+
+	return return $self->ret('string', $name->{ns}) if defined $name;
+	return $self->ret('string', '');
+}
+
+sub function_name {
+	my ($self, $args) = @_;
+
+	my $node = $self->_get_first_node_by_doc_order($args);
+
+	return $node if $node->{type} eq 'Error';
+	return $self->ret('string', '') unless defined $node;
+
+	my $name = $self->get_expanded_name($node);
+
+	return return $self->ret('string', $name->{qname}) if defined $name;
+	return $self->ret('string', '');
 }
 
 sub _get_first_node_by_doc_order {
@@ -846,8 +842,23 @@ sub get_string_value {
 sub get_expanded_name {
 	my ($self, $node) = @_;
 
+	if ($node->{type} eq 'tag'){
+
+		return {
+			'ns'    => $node->{ns},
+			'qname' => $node->{name},
+			'local' => defined $node->{local_name} ? $node->{local_name} : $node->{name},
+		};
+	}
+
+	if ($node->{type} eq 'root'){
+
+		return undef;
+	}
+
 	print "# we can't find an expanded name for this node!\n";
 	print Dumper $node;
+exit;
 
 	return ['', ''];
 }
