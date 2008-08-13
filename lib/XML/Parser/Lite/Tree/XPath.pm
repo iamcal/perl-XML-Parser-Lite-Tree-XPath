@@ -5,7 +5,7 @@ use XML::Parser::Lite::Tree::XPath::Tokener;
 use XML::Parser::Lite::Tree::XPath::Tree;
 use XML::Parser::Lite::Tree::XPath::Eval;
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 # v0.10 - tokener finished
 # v0.11 - tree builder started
@@ -16,7 +16,8 @@ our $VERSION = '0.20';
 # v0.17 - more eval engine work - 7,8,9 (function arg validation)
 # v0.18 - more eval engine work - 1-22 (function map, arg validation, axis handlers)
 # v0.19 - cleanup, code coverage, split out axis parser
-# v0.20 - moved to string types, fixed attribute axis, enabled all zvon tests
+# v0.20 - moved to string types, fixed attribute axis, enabled all zvon tests, started on function tests
+# v0.21 - ???
 
 # TODO
 # move context/input into property of the token

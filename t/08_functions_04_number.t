@@ -1,4 +1,4 @@
-use Test::More tests => 0;
+use Test::More tests => 1;
 
 use lib 'lib';
 use strict;
@@ -16,6 +16,8 @@ set_xml(q!
 		<bbb>yay</bbb>
 	</aaa>
 !);
+
+ok(1);
 
 
 #
