@@ -6,6 +6,7 @@ use Test::More;
 
 use XML::Parser::Lite::Tree;
 use XML::Parser::Lite::Tree::XPath;
+use Data::Dumper;
 
 require Exporter;
 @ISA    = qw(Exporter);
@@ -95,6 +96,10 @@ sub test_nodeset {
 			}elsif ($key eq 'type'){
 
 				$ok = $nodes->[$i]->{type} eq $xnode->{$key};
+
+			}elsif ($key eq 'value'){
+
+				$ok = $nodes->[$i]->{value} eq $xnode->{$key};
 
 			}else{
 				$ok = $nodes->[$i]->{attributes}->{$key} eq $xnode->{$key};
