@@ -118,7 +118,7 @@ sub step {
 	# Literal
 	#
 
-	if ($self->{input} =~ m!^(('[^']*')|("[^']*"))!){
+	if ($self->{input} =~ m!^(('[^']*')|("[^"]*"))!){
 
 		my $inner = $1;
 		$inner =~ m!^.(.*).$!;

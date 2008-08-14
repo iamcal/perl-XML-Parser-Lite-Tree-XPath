@@ -1,4 +1,4 @@
-use Test::More tests => 34;
+use Test::More tests => 53;
 
 use lib 'lib';
 use strict;
@@ -43,8 +43,44 @@ child::*[self::chapter or self::appendix][position()=last()]
 PATHS
 ;
 
+
+#
+# some simple tests to see if we can toke these strings
+#
+
 my $tokener = XML::Parser::Lite::Tree::XPath::Tokener->new();
 
 for my $path(@paths){
 	ok($tokener->parse($path));
+}
+
+
+#
+# some further tests to check the tokenization of certain inputs
+#
+
+&test_tokens('child::text()',	['AxisName child', 'Symbol ::', 'NodeType text', 'Symbol (', 'Symbol )']);
+
+&test_tokens('"foo"',		['Literal foo']);
+&test_tokens('"foo" "bar"',	['Literal foo', 'Literal bar']);
+
+
+
+
+
+
+#
+# this is just a shortcut function
+#
+
+sub test_tokens {
+	my ($in, $expected) = @_;
+	$tokener->parse($in);
+	is(scalar @{$tokener->{tokens}}, scalar @{$expected});
+	for my $i (0..scalar @{$expected} - 1){
+		my ($t, $c) = split / /, $expected->[$i], 2;
+		is($tokener->{tokens}->[$i]->{type}, $t);
+		is($tokener->{tokens}->[$i]->{content}, $c);
+
+	}
 }
