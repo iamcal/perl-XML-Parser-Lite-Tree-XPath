@@ -121,7 +121,7 @@ sub eval {
 
 			for my $tag(@{$context->{value}}){
 
-				if (($tag->{'type'} eq 'tag') && ($tag->{'name'} eq $self->{content})){
+				if (($tag->{'type'} eq 'element') && ($tag->{'name'} eq $self->{content})){
 					push @{$out->{value}}, $tag;
 				}
 
@@ -605,7 +605,7 @@ sub _recurse_find_id {
 	# is it a match?
 	#
 
-	if ($node->{type} eq 'tag' && length $node->{uid}){
+	if ($node->{type} eq 'element' && length $node->{uid}){
 
 		for my $id (@{$ids}){
 			if ($id eq $node->{uid}){
@@ -620,7 +620,7 @@ sub _recurse_find_id {
 	# do we need to recurse?
 	#
 
-	if ($node->{type} eq 'tag' || $node->{type} eq 'root'){
+	if ($node->{type} eq 'element' || $node->{type} eq 'root'){
 
 		for my $child (@{$node->{children}}){
 
@@ -774,7 +774,7 @@ sub get_string_value {
 	my ($self, $node) = @_;
 
 
-	if ($node->{type} eq 'tag'){
+	if ($node->{type} eq 'element'){
 
 		#
 		# The string-value of an element node is the concatenation of the string-values
@@ -783,7 +783,7 @@ sub get_string_value {
 
 		my $value = '';
 		for my $child (@{$node->{children}}){
-			if ($child->{type} eq 'tag'){
+			if ($child->{type} eq 'element'){
 				$value .= $self->get_string_value($child);
 			}
 			if ($child->{type} eq 'data'){
@@ -842,7 +842,7 @@ sub get_string_value {
 sub get_expanded_name {
 	my ($self, $node) = @_;
 
-	if ($node->{type} eq 'tag'){
+	if ($node->{type} eq 'element'){
 
 		return {
 			'ns'    => $node->{ns},

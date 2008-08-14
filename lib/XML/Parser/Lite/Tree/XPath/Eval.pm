@@ -85,7 +85,7 @@ sub mark_uids {
 	# mark
 	#
 
-	if ($tag->{type} eq 'tag'){
+	if ($tag->{type} eq 'element'){
 
 		$tag->{uid} = '';
 
@@ -105,7 +105,7 @@ sub mark_uids {
 	# descend
 	#
 
-	if ($tag->{type} eq 'root' || $tag->{type} eq 'tag'){
+	if ($tag->{type} eq 'root' || $tag->{type} eq 'element'){
 
 		for my $child (@{$tag->{children}}){
 
@@ -124,7 +124,7 @@ sub mark_namespaces {
 	# mark
 	#
 
-	if ($obj->{type} eq 'tag'){
+	if ($obj->{type} eq 'element'){
 
 		#
 		# first, add any new NS's to the stack
@@ -170,7 +170,7 @@ sub mark_namespaces {
 	# descend
 	#
 
-	if ($obj->{type} eq 'root' || $obj->{type} eq 'tag'){
+	if ($obj->{type} eq 'root' || $obj->{type} eq 'element'){
 
 		for my $child (@{$obj->{children}}){
 

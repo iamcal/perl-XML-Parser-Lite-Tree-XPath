@@ -81,7 +81,7 @@ sub _axis_descendant_single {
 
 	for my $child(@{$tag->{children}}){
 
-		if ($child->{type} eq 'tag'){
+		if ($child->{type} eq 'element'){
 
 			map{
 				push @out, $_;
@@ -231,7 +231,7 @@ sub _axis_following_recurse {
 
 	for my $child(@{$tag->{children}}){
 
-		if (($child->{order}) != $min && ($child->{type} eq 'tag')){
+		if (($child->{order}) != $min && ($child->{type} eq 'element')){
 
 			map{
 				push @out, $_;
@@ -270,7 +270,7 @@ sub _axis_preceding_recurse {
 
 	for my $child(@{$tag->{children}}){
 
-		if (($child->{order}) != $max && ($child->{type} eq 'tag')){
+		if (($child->{order}) != $max && ($child->{type} eq 'element')){
 
 			map{
 				push @out, $_;
