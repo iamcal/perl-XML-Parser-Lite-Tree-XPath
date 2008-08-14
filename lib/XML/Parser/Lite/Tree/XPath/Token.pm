@@ -753,7 +753,7 @@ sub compare_op {
 		if ($op eq '>' ){ return $self->ret('boolean', ($a1->{value} >  $a2->{value}) ? 1 : 0); }
 		if ($op eq '<' ){ return $self->ret('boolean', ($a1->{value} <  $a2->{value}) ? 1 : 0); }
 	}
-
+ 
 	return $self->ret('Error', "Don't know how to compare $op on type $a1->{type}");
 }
 
@@ -858,9 +858,8 @@ sub get_expanded_name {
 
 	print "# we can't find an expanded name for this node!\n";
 	print Dumper $node;
-exit;
 
-	return ['', ''];
+	return undef;
 }
 
 1;
