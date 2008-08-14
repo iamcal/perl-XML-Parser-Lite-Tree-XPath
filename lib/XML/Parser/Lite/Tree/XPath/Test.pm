@@ -20,7 +20,8 @@ sub set_xml {
 	$xml =~ s/>\s+</></sg;
 	$xml =~ s/^\s*(.*?)\s*$/$1/;
 
-	my $tree = XML::Parser::Lite::Tree::instance()->parse($xml);
+	my $parser = new XML::Parser::Lite::Tree(process_ns => 1);
+	my $tree = $parser->parse($xml);
 	$xpath = new XML::Parser::Lite::Tree::XPath($tree);
 }
 

@@ -22,13 +22,6 @@ sub query {
 	$self->{uids} = {};
 	$self->mark_uids($self->{tree});
 
-	unless ($self->{tree}->{ns_done}){
-
-		$self->{ns_stack} = {};
-		$self->mark_namespaces($self->{tree});
-		$self->{tree}->{ns_done} = 1;
-	}
-
 	my $token = $xpath->{tokens}->[0];
 	unless (defined $token){
 		$self->{error} = "couldn't get root token to eval.";
@@ -111,80 +104,6 @@ sub mark_uids {
 
 			$self->mark_uids($child);
 		}
-	}
-}
-
-sub mark_namespaces {
-	my ($self, $obj) = @_;
-
-
-	my @ns_keys;
-
-	#
-	# mark
-	#
-
-	if ($obj->{type} eq 'element'){
-
-		#
-		# first, add any new NS's to the stack
-		#
-
-		my @keys = keys %{$obj->{attributes}};
-
-		for my $k(@keys){
-
-			if ($k =~ /^xmlns:(.*)$/){
-
-				push @{$self->{ns_stack}->{$1}}, $obj->{attributes}->{$k};
-				push @ns_keys, $1;
-				delete $obj->{attributes}->{$k};
-			}
-
-			if ($k eq 'xmlns'){
-
-				push @{$self->{ns_stack}->{__default__}}, $obj->{attributes}->{$k};
-				push @ns_keys, '__default__';
-				delete $obj->{attributes}->{$k};
-			}
-		}
-
-
-		#
-		# now - does this tag have a NS?
-		#
-
-		if ($obj->{name} =~ /^(.*?):(.*)$/){
-
-			$obj->{local_name} = $2;
-			$obj->{ns_key} = $1;
-			$obj->{ns} = $self->{ns_stack}->{$1}->[-1];
-		}else{
-			$obj->{local_name} = $obj->{name};
-			$obj->{ns} = $self->{ns_stack}->{__default__}->[-1];
-		}
-	}
-
-
-	#
-	# descend
-	#
-
-	if ($obj->{type} eq 'root' || $obj->{type} eq 'element'){
-
-		for my $child (@{$obj->{children}}){
-
-			$self->mark_namespaces($child);
-		}
-	}
-
-
-	#
-	# pop from stack
-	#
-
-	for my $k (@ns_keys){
-		pop @{$self->{ns_stack}->{$k}};
 	}
 }
 
