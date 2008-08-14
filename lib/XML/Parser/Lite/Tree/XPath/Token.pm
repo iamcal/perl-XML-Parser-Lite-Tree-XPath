@@ -786,7 +786,7 @@ sub get_string_value {
 			if ($child->{type} eq 'element'){
 				$value .= $self->get_string_value($child);
 			}
-			if ($child->{type} eq 'data'){
+			if ($child->{type} eq 'text'){
 				$value .= $self->get_string_value($child);
 			}
 		}
@@ -823,7 +823,7 @@ sub get_string_value {
 		# opening <!-- or the closing -->.
 		#
 
-	if ($node->{type} eq 'data'){
+	if ($node->{type} eq 'text'){
 
 		#
 		# The string-value of a text node is the character data. A text node always has
