@@ -10,7 +10,7 @@ use Data::Dumper;
 
 require Exporter;
 @ISA    = qw(Exporter);
-@EXPORT = qw(set_xml test_tree test_nodeset test_number test_string);
+@EXPORT = qw(set_xml test_tree test_nodeset test_number test_string test_error);
 
 our $xpath;
 
@@ -202,6 +202,27 @@ sub test_string {
 	}else{
 		print "# got a $ret->{type} result\n";
 		ok(0);
+	}
+}
+
+sub test_error {
+	my ($path, $expected) = @_;
+
+	my $ret = $xpath->query($path);
+
+	if ($ret){
+		print "# no error - but we expected one!\n";
+		ok(0);
+	}else{
+		if ($xpath->{error} =~ $expected){
+
+			ok(1);
+		}else{
+			print "# wrong error\n";
+			print "#     expected: $expected\n";
+			print "#          got: $xpath->{error}\n";
+			ok(0);
+		}
 	}
 }
 
