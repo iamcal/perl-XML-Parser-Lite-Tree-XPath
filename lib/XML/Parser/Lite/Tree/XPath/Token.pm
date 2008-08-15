@@ -209,48 +209,95 @@ sub eval {
 			return $self->ret('Error', "No handler for function call '$self->{content}'");
 		}
 
-		# prepare the arguments
+
+		#
+		# evaluate each of the supplied args first
+		#
+
+		my @in_args;
+		for my $source (@{$self->{tokens}}){
+			my $out = $source->eval($context);
+			return $out if $out->is_error;
+			push @in_args, $out;
+		}
+
+
+		#
+		# now check them against the function signature
+		#
 
 		my $func = $handler->[0];
 		my $sig = $handler->[1];
-
 		my @sig = split /,/, $sig;
-		my @args;
+		my @out_args;
+
+		my $position = 0;
 
 		for my $sig(@sig){
 
-			my $source = $self->{tokens}->[scalar @args];
+			my $repeat = 0;
+			my $optional = 0;
 
-			if (defined $source){
-				$sig =~ s/\?$//;
+			if ($sig =~ m/\+$/){ $repeat = 1; }
+			if ($sig =~ m/\?$/){ $optional = 1; }
+			$sig =~ s/[?+]$//;
 
-				my $out = $source->eval($context);
-				return $out if $out->is_error;
+			#
+			# repeating args are somewhat tricky
+			#
 
-				my $value = undef;
+			if ($repeat){
 
-				$value = $out->get_string if $sig eq 'string';
-				$value = $out->get_number if $sig eq 'number';
-				$value = $out->get_nodeset if $sig eq 'nodeset';
-				$value = $out->get_boolean if $sig eq 'boolean';
-				$value = $out if $sig eq 'any';
+				my $count = 0;
 
-				return $self->ret('Error', "Can't coerce a function argument into a '$sig'") unless defined $value;
-				return $value if $value->is_error;
+				while (1){
+					$count++;
 
-				push @args, $value;
+					unless (defined $in_args[$position]){
+						if ($count == 1){
+							return $self->ret('Error', "Argument $position to function $self->{content} is required (type $sig)");
+						}
+						last;
+					}
+
+					my $value = $self->coerce($in_args[$position], $sig);
+					$position++;
+					if (defined $value){
+						return $value if $value->is_error;
+						push @out_args, $value;
+
+					}else{
+						if ($count == 1){
+							return $self->ret('Error', "Can't coerce argument $position to a $sig in function $self->{content}");
+						}
+						last;
+					}
+				}
 
 			}else{
-				if ($sig =~ m/\?$/){
-					# it's ok - this arg was optional
+
+				unless (defined $in_args[$position]){
+					if ($optional){
+						next;
+					}else{
+						return $self->ret('Error', "Argument $position to function $self->{content} is required (type $sig)");
+					}
+				}
+
+				my $value = $self->coerce($in_args[$position], $sig);
+				$position++;
+
+				if (defined $value){
+
+					return $value if $value->is_error;
+					push @out_args, $value;
 				}else{
-					my $num = 1 + scalar @args;
-					return $self->ret('Error', "Argument $num to function $self->{content} is required (type $sig)");
+					return $self->ret('Error', "Can't coerce argument $position to a $sig in function $self->{content}");
 				}
 			}
 		}
 
-		return &{$func}($self, \@args);
+		return &{$func}($self, \@out_args);
 
 	}elsif ($self->{type} eq 'FunctionArg'){
 
@@ -379,6 +426,20 @@ sub eval {
 	}
 }
 
+sub coerce {
+	my ($self, $arg, $type) = @_;
+
+	my $value = undef;
+
+	$value = $arg->get_string if $type eq 'string';
+	$value = $arg->get_number if $type eq 'number';
+	$value = $arg->get_nodeset if $type eq 'nodeset';
+	$value = $arg->get_boolean if $type eq 'boolean';
+	$value = $arg if $type eq 'any';
+
+	return $value;
+}
+
 sub get_child_arg {
 	my ($self, $pos, $type) = @_;
 
@@ -407,12 +468,12 @@ sub get_function_handler {
 		'name'			=> [\&function_name,		'nodeset?'		],
 
 		# string functions
-		'string'		=> [undef,			'any?'			],
-		'concat'		=> [undef,			'string,string+'	],
+		'string'		=> [\&function_string,		'any?'			],
+		'concat'		=> [\&function_concat,		'string,string+'	],
 		'starts-with'		=> [\&function_starts_with,	'string,string'		],
 		'contains'		=> [\&function_contains,	'string,string'		],
-		'substring-before'	=> [undef,			'string,string'		],
-		'substring-after'	=> [undef,			'string,string'		],
+		'substring-before'	=> [\&function_substring_befor,	'string,string'		],
+		'substring-after'	=> [\&function_substring_after,	'string,string'		],
 		'substring'		=> [undef,			'string,number,number?'	],
 		'string-length'		=> [\&function_string_length,	'string?'		],
 		'normalize-space'	=> [\&function_normalize_space,	'string?'		],
@@ -721,6 +782,85 @@ sub _get_first_node_by_doc_order {
 	return $self->ret('Error', "Argument to fucntion isn't expected node/nodeset");
 }
 
+sub function_string {
+	my ($self, $args) = @_;
+
+
+	#
+	# for no args, use the context node
+	#
+
+	unless (defined $args->[0]){
+
+		return $self->ret('string', $self->get_string_value($self->{context}->{value})) if $self->{context}->{type} eq 'node';
+		return $self->ret('string', $self->get_string_value($self->{context}->{value}->[0])) if $self->{context}->{type} eq 'nodeset';
+
+		return $self->ret('Error', "If argument to string() is ommitted, context must be node or nodeset - not $self->{context}->{type}");
+	}
+
+	if ($args->[0]->{type} eq 'number'){
+
+		return $self->ret('string', $args->[0]->{value});
+	}
+
+	if ($args->[0]->{type} eq 'string'){
+
+		return $self->ret('string', $args->[0]->{value});
+	}
+
+	if ($args->[0]->{type} eq 'node' || $args->[0]->{type} eq 'nodeset'){
+
+		my $node = $self->_get_first_node_by_doc_order($args);
+		return $node if $node->{type} eq 'Error';
+
+		if ($node->{type} eq 'element'){
+			return $self->ret('string', $self->get_string_value($node));
+		}else{
+			return $self->ret('string', '');
+		}
+	}
+
+	if ($args->[0]->{type} eq 'boolean'){
+
+		return $self->ret('string', $args->[0]->{value} ? 'true' : 'false');
+	}
+
+	return $self->ret('Error', "Don't know how to perform string() on a $args->[0]->{type}");
+}
+
+sub function_concat {
+	my ($self, $args) = @_;
+
+	my $out = '';
+	$out .= $_->{value} for @{$args};
+
+	return $self->ret('string', $out);
+}
+
+sub function_substring_befor {
+	my ($self, $args) = @_;
+
+	my $idx = index $args->[0]->{value}, $args->[1]->{value};
+
+	if ($idx == -1){
+		return $self->ret('string', '');
+	}
+
+	return $self->ret('string', substr $args->[0]->{value}, 0, $idx);
+}
+
+sub function_substring_after {
+	my ($self, $args) = @_;
+
+	my $idx = index $args->[0]->{value}, $args->[1]->{value};
+
+	if ($idx == -1){
+		return $self->ret('string', '');
+	}
+
+	return $self->ret('string', substr $args->[0]->{value}, $idx + length $args->[1]->{value});
+}
+
 sub simple_floor {
 	my ($self, $value) = @_;
 	return int $value;
@@ -774,7 +914,7 @@ sub get_string_value {
 	my ($self, $node) = @_;
 
 
-	if ($node->{type} eq 'element'){
+	if ($node->{type} eq 'element' || $node->{type} eq 'root'){
 
 		#
 		# The string-value of an element node is the concatenation of the string-values
@@ -833,7 +973,7 @@ sub get_string_value {
 		return $node->{content};
 	}
 
-	print "# we can't find a text-value for this node!\n";
+	print "# we can't find a string-value for this node!\n";
 	print Dumper $node;
 
 	return '';
