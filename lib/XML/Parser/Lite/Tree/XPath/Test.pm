@@ -10,7 +10,15 @@ use Data::Dumper;
 
 require Exporter;
 @ISA    = qw(Exporter);
-@EXPORT = qw(set_xml test_tree test_nodeset test_number test_string test_error);
+@EXPORT = qw(
+	set_xml
+	test_tree
+	test_nodeset
+	test_number
+	test_string
+	test_error
+	test_boolean
+);
 
 our $xpath;
 
@@ -223,6 +231,36 @@ sub test_error {
 			print "#          got: $xpath->{error}\n";
 			ok(0);
 		}
+	}
+}
+
+sub test_boolean {
+	my ($path, $expected) = @_;
+
+	my $ret = $xpath->query($path);
+
+	if (!$ret){
+		print "Error: $xpath->{error}\n";
+		ok(0);
+		ok(0);
+		return;
+	}
+
+	ok($ret->{type} eq 'boolean');
+
+	if ($ret->{type} eq 'boolean'){
+		my $ok = 0;
+		$ok = 1 if $expected && $ret->{value};
+		$ok = 1 if !$expected && !$ret->{value};
+
+		ok($ok);
+
+		unless ($ok){
+			print "# expected $expected, got $ret->{value}\n";
+		}
+	}else{
+		print "# got a $ret->{type} result\n";
+		ok(0);
 	}
 }
 
