@@ -3,7 +3,8 @@ TODO
  * change context info (positions/count) into a stack on the context object, for nested predicates
  * implement the missing functions
  * tests for all functions ops
- * check test coverage
+ * increase test coverage (currently 78.4%)
+ * remove all the Data::Dumper use's
 
 0.21 - ???
  * ???
