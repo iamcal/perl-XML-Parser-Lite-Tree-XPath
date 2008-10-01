@@ -7,7 +7,8 @@ TODO
  * remove all the Data::Dumper use's
 
 0.21 - ???
- * ???
+ * added basic docs for main module
+ * more tests
 
 0.20 - 2008-08-13
  * moved to string types
