@@ -38,7 +38,7 @@ t/05_zvon_21.t
 t/05_zvon_22.t
 t/06_expr.t
 t/07_cover_token.t
-07_cover_01_result.t
+t/07_cover_01_result.t
 t/07_cover_02_axis.t
 t/08_functions_01_nodeset.t
 t/08_functions_02_string.t
