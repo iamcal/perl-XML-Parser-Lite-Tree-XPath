@@ -6,9 +6,10 @@ TODO
  * increase test coverage (currently 78.4%)
  * remove all the Data::Dumper use's
 
-0.21 - ???
+0.21 - 2009-04-10
  * added basic docs for main module
  * more tests
+ * made it work correctly with the newer  XML-Parser-Lite-Tree syntax
 
 0.20 - 2008-08-13
  * moved to string types
