@@ -5,7 +5,7 @@ use XML::Parser::Lite::Tree::XPath::Tokener;
 use XML::Parser::Lite::Tree::XPath::Tree;
 use XML::Parser::Lite::Tree::XPath::Eval;
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 sub new {
 	my $class = shift;

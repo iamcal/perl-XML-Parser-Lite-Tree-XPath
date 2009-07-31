@@ -1,4 +1,4 @@
-use Test::More tests => 7;
+use Test::More tests => 8;
 
 use lib 'lib';
 use strict;
@@ -26,7 +26,14 @@ for my $type(@types_noex){
 
 my $token = XML::Parser::Lite::Tree::XPath::Token->new();
 $token->{type} = 'TypeIMadeUp';
-ok($token->is_expression == 0);
+my $warned = 0;
+my $is_expression = undef;
+eval {
+	local $SIG{__WARN__} = sub { $warned = 1; };
+	$is_expression = $token->is_expression;
+};
+ok($is_expression == 0);
+is($warned, 1, "warned correctly");
 
 
 #
