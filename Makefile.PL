@@ -6,6 +6,6 @@ WriteMakefile(
 	'VERSION_FROM'	=> 'lib/XML/Parser/Lite/Tree/XPath.pm',
 	'PREREQ_PM'	=> {
 		Test::More		=> 0,
-		XML::Parser::Lite::Tree	=> 0.10, # version with namespace/dtd/pi support & callback fix
+		XML::Parser::Lite::Tree	=> 0.11, # version with namespace/dtd/pi support, callback fix & 5.8.9 fix
 	},
 );
