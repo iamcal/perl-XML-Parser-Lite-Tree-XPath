@@ -378,6 +378,8 @@ sub eval {
 
 		return $a1 if $a1->is_error;
 		return $a2 if $a2->is_error;
+		return $a1 if $a1->is_nan;
+		return $a2 if $a1->is_nan;
 
 		my $result = 0;
 		$result = $a1->{value} * $a2->{value} if $self->{content} eq '*';
@@ -404,6 +406,8 @@ sub eval {
 
 		return $a1 if $a1->is_error;
 		return $a2 if $a2->is_error;
+		return $a1 if $a1->is_nan;
+		return $a2 if $a2->is_nan;
 
 		my $result = 0;
 		$result = $a1->{value} + $a2->{value} if $self->{content} eq '+';
@@ -416,10 +420,15 @@ sub eval {
 		my $a1 = $self->get_child_arg(0, 'number');
 
 		return $a1 if $a1->is_error;
+		return $a1 if $a1->is_nan;
 
 		$a1->{value} = - $a1->{value};
 
 		return $a1;
+
+	}elsif ($self->{type} eq 'PrimaryExpr'){
+
+		return $self->{tokens}->[0]->eval($context);
 
 	}else{
 		return $self->ret('Error', "Don't know how to eval a '$self->{type}' node.");
@@ -474,7 +483,7 @@ sub get_function_handler {
 		'contains'		=> [\&function_contains,	'string,string'		],
 		'substring-before'	=> [\&function_substring_befor,	'string,string'		],
 		'substring-after'	=> [\&function_substring_after,	'string,string'		],
-		'substring'		=> [undef,			'string,number,number?'	],
+		'substring'		=> [\&function_substring,	'string,number,number?'	],
 		'string-length'		=> [\&function_string_length,	'string?'		],
 		'normalize-space'	=> [\&function_normalize_space,	'string?'		],
 		'translate'		=> [undef,			'string,string,string'	],
@@ -861,6 +870,27 @@ sub function_substring_after {
 	return $self->ret('string', substr $args->[0]->{value}, $idx + length $args->[1]->{value});
 }
 
+sub function_substring {
+	my ($self, $args) = @_;
+
+	my $start = $self->simple_round($args->[1]->{value});
+
+	if (defined $args->[2] && !$args->[2]->is_nan){
+		my $len = $self->simple_round($args->[2]->{value});
+		$len = 0 if $len < 0;
+
+		if ($start < 1){
+			$len -= 1 - $start;
+			$start = 1;
+		}
+
+		return $self->ret('string', substr $args->[0]->{value}, $start-1, $len);
+	}
+
+	$start = 1 if $start < 1;
+	return $self->ret('string', substr $args->[0]->{value}, $start-1);
+}
+
 sub simple_floor {
 	my ($self, $value) = @_;
 	return int $value;
@@ -871,6 +901,11 @@ sub simple_ceiling {
 	my $t = int $value;
 	return $t if $t == $value;
 	return $t+1;
+}
+
+sub simple_round {
+	my ($self, $value) = @_;
+	return int ($value + 0.5);
 }
 
 sub compare_op {
@@ -900,6 +935,7 @@ sub compare_op {
 sub op_mod {
 	my ($self, $n1, $n2) = @_;
 
+	return 'NaN' if $n2 == 0;
 	my $r = int ($n1 / $n2);
 	return $n1 - ($r * $n2);
 }
@@ -907,6 +943,7 @@ sub op_mod {
 sub op_div {
 	my ($self, $n1, $n2) = @_;
 
+	return 'NaN' if $n2 == 0;
 	return $n1 / $n2;
 }
 
