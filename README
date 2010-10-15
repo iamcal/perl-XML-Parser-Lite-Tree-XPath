@@ -18,10 +18,10 @@ DEPENDENCIES
 This module requires these other modules and libraries:
 
   Test::More
-  XML::Parser::Lite::Tree (0.10 or greater)
+  XML::Parser::Lite::Tree (0.11 or greater)
 
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2004-2009 Cal Henderson <cal@iamcal.com>
+Copyright (C) 2004-2010 Cal Henderson <cal@iamcal.com>
 License: Perl Artistic License 2.0
