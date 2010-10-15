@@ -1,4 +1,4 @@
-use Test::More tests => 61;
+use Test::More tests => 77;
 
 use lib 'lib';
 use strict;
@@ -102,6 +102,18 @@ test_string('substring-after("abcdef","z")', "");
 # The substring function returns the substring of the first argument starting at the position
 # specified in the second argument with length specified in the third argument.
 #
+# Note: values are rounded as if with round()
+#
+
+test_string('substring("12345",2,3)', "234");
+test_string('substring("12345",2)', "2345");
+test_string('substring("12345", 1.5, 2.6)', "234");
+test_string('substring("12345", 0, 3)',"12");
+test_string('substring("12345", 0 div 0, 3)', "");
+test_string('substring("12345", 1, 0 div 0)', "");
+test_string('substring("12345", -42, 1 div 0)', "12345");
+test_string('substring("12345", -1 div 0, 1 div 0)', "");
+
 
 #
 # Function: number string-length(string?)
