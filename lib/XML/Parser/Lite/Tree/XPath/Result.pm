@@ -30,6 +30,11 @@ sub is_error {
 	return ($self->{type} eq 'Error') ? 1 : 0;
 }
 
+sub is_nan {
+	my ($self) = @_;
+	return ($self->{type} eq 'number' && ''.$self->{value} eq 'NaN') ? 1 : 0;
+}
+
 sub normalize {
 	my ($self) = @_;
 
