@@ -176,9 +176,9 @@ sub test_number {
 	ok($ret->{type} eq 'number');
 
 	if ($ret->{type} eq 'number'){
-		ok($ret->{value} == $expected);
+		ok($ret->{value} eq $expected);
 
-		if ($ret->{value} != $expected){
+		if ($ret->{value} ne $expected){
 			print "expected $expected, got $ret->{value}\n";
 		}
 	}else{
