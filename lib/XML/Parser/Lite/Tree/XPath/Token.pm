@@ -381,6 +381,11 @@ sub eval {
 		return $a1 if $a1->is_nan;
 		return $a2 if $a1->is_nan;
 
+		return $self->ret('number', 'NaN') if $a1->{value} eq 'Infinity';
+		return $self->ret('number', 'NaN') if $a1->{value} eq '-Infinity';
+		return $self->ret('number', 'NaN') if $a2->{value} eq 'Infinity';
+		return $self->ret('number', 'NaN') if $a1->{value} eq '-Infinity';
+
 		my $result = 0;
 		$result = $a1->{value} * $a2->{value} if $self->{content} eq '*';
 		$result = $self->op_mod($a1->{value}, $a2->{value}) if $self->{content} eq 'mod';
@@ -421,6 +426,10 @@ sub eval {
 
 		return $a1 if $a1->is_error;
 		return $a1 if $a1->is_nan;
+
+		return $self->ret('number', '-0') if $a1->{value} eq '0';
+		return $self->ret('number', '-Infinity') if $a1->{value} eq 'Infinity';
+		return $self->ret('number', 'Infinity') if $a1->{value} eq '-Infinity';
 
 		$a1->{value} = - $a1->{value};
 
@@ -943,7 +952,14 @@ sub op_mod {
 sub op_div {
 	my ($self, $n1, $n2) = @_;
 
-	return 'NaN' if $n2 == 0;
+	# 0/0 is NaN
+	if (($n2 eq '-0' || $n2 == 0) && ($n1 eq '-0' || $n1 == 0)){
+		return 'NaN';
+	}
+
+	return '-Infinity' if $n2 eq '-0';
+	return 'Infinity' if $n2 eq '0';
+
 	return $n1 / $n2;
 }
 
