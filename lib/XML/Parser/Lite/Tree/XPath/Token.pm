@@ -964,13 +964,13 @@ sub op_mul {
 #print "mul: $n1, $n2\n";
 
 	# 0*Inf is NaN
-	return 'NaN' if ($n1 eq 'Infinity' || $n1 eq '-Infinity') && ($n2 ne '-0' && $n2 ne '0');
-	return 'NaN' if ($n2 eq 'Infinity' || $n2 eq '-Infinity') && ($n1 ne '-0' && $n1 ne '0');
+	return 'NaN' if ($n1 eq 'Infinity' || $n1 eq '-Infinity') && ($n2 eq '-0' || $n2 eq '0');
+	return 'NaN' if ($n2 eq 'Infinity' || $n2 eq '-Infinity') && ($n1 eq '-0' || $n1 eq '0');
+
+	return 0 if $n1 eq '-0' && $n2 eq '-0';
 
 	my $neg1 = $self->is_neg($n1);
 	my $neg2 = $self->is_neg($n2);
-
-	return 0 if $n1 eq '-0' && $n2 eq '-0';
 
 	if ($n1 eq '-0'){ return $neg2 ? 0 : '-0'; }
 	if ($n2 eq '-0'){ return $neg1 ? 0 : '-0'; }
