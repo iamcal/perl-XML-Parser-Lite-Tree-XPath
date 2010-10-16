@@ -378,22 +378,12 @@ sub eval {
 
 		return $a1 if $a1->is_error;
 		return $a2 if $a2->is_error;
+		return $a1 if $a1->is_nan;
+		return $a2 if $a2->is_nan;
 
 		return $self->ret('number', $self->op_mod($a1->{value}, $a2->{value})) if $self->{content} eq 'mod';
 		return $self->ret('number', $self->op_div($a1->{value}, $a2->{value})) if $self->{content} eq 'div';
-
-		if ($self->{content} eq '*'){
-
-			return $a1 if $a1->is_nan;
-			return $a2 if $a1->is_nan;
-
-			return $self->ret('number', 'NaN') if $a1->{value} eq 'Infinity';
-			return $self->ret('number', 'NaN') if $a1->{value} eq '-Infinity';
-			return $self->ret('number', 'NaN') if $a2->{value} eq 'Infinity';
-			return $self->ret('number', 'NaN') if $a1->{value} eq '-Infinity';
-
-			return $self->ret('number', $a1->{value} * $a2->{value});
-		}
+		return $self->ret('number', $self->op_mul($a1->{value}, $a2->{value})) if $self->{content} eq '*';
 
 		return $self->ret('Error', "Unknown MultiplicativeExpr $self->{content}");
 
@@ -418,11 +408,10 @@ sub eval {
 		return $a1 if $a1->is_nan;
 		return $a2 if $a2->is_nan;
 
-		my $result = 0;
-		$result = $a1->{value} + $a2->{value} if $self->{content} eq '+';
-		$result = $a1->{value} - $a2->{value} if $self->{content} eq '-';
+		return $self->ret('number', $self->op_add($a1->{value}, $a2->{value})) if $self->{content} eq '+';
+		return $self->ret('number', $self->op_sub($a1->{value}, $a2->{value})) if $self->{content} eq '-';
 
-		return $self->ret('number', $result);
+		return $self->ret('Error', "Unknown AdditiveExpr $self->{content}");
 
 	}elsif ($self->{type} eq 'UnaryExpr'){
 
@@ -949,6 +938,55 @@ sub compare_op {
 	return $self->ret('Error', "Don't know how to compare $op on type $a1->{type}");
 }
 
+sub op_add {
+	my ($self, $n1, $n2) = @_;
+
+	# Inf-Inf is NaN
+	return 'NaN' if $n1 eq 'Infinity' && $n2 eq '-Infinity';
+	return 'NaN' if $n1 eq '-Infinity' && $n2 eq 'Infinity';
+
+	return $n1 + $n2;
+}
+
+sub op_sub {
+	my ($self, $n1, $n2) = @_;
+
+	# Inf-Inf is NaN
+	return 'NaN' if $n1 eq 'Infinity' && $n2 eq 'Infinity';
+	return 'NaN' if $n1 eq '-Infinity' && $n2 eq '-Infinity';
+
+	return $n1 - $n2;
+}
+
+sub op_mul {
+	my ($self, $n1, $n2) = @_;
+
+#print "mul: $n1, $n2\n";
+
+	# 0*Inf is NaN
+	return 'NaN' if ($n1 eq 'Infinity' || $n1 eq '-Infinity') && ($n2 ne '-0' && $n2 ne '0');
+	return 'NaN' if ($n2 eq 'Infinity' || $n2 eq '-Infinity') && ($n1 ne '-0' && $n1 ne '0');
+
+	my $neg1 = $self->is_neg($n1);
+	my $neg2 = $self->is_neg($n2);
+
+	return 0 if $n1 eq '-0' && $n2 eq '-0';
+
+	if ($n1 eq '-0'){ return $neg2 ? 0 : '-0'; }
+	if ($n2 eq '-0'){ return $neg1 ? 0 : '-0'; }
+
+	return $n1 * $n2;
+}
+
+sub is_neg {
+	my ($self, $n) = @_;
+
+	return 1 if $n eq '-Infinity';
+	return 1 if $n eq '-0';
+	return 0 if $n eq 'Infinity';
+	return $n >= 0 ? 1 : 0;
+}
+
 sub op_mod {
 	my ($self, $n1, $n2) = @_;
 
@@ -962,6 +1000,11 @@ sub op_div {
 
 	# 0/0 is NaN
 	if (($n2 eq '-0' || $n2 == 0) && ($n1 eq '-0' || $n1 == 0)){
+		return 'NaN';
+	}
+
+	# Inf/Inf is NaN
+	if (($n1 eq 'Infinity' || $n1 eq '-Infinity') && ($n2 eq 'Infinity' || $n2 eq '-Infinity')){
 		return 'NaN';
 	}
 
