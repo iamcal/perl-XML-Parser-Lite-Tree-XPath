@@ -945,6 +945,10 @@ sub op_add {
 	return 'NaN' if $n1 eq 'Infinity' && $n2 eq '-Infinity';
 	return 'NaN' if $n1 eq '-Infinity' && $n2 eq 'Infinity';
 
+	return '-0' if $n1 eq '-0' && $n2 eq '-0';
+	return '-0' if $n1 eq '-0' && $n2 eq '0';
+	return '-0' if $n1 eq '0' && $n2 eq '-0';
+
 	return $n1 + $n2;
 }
 
@@ -955,13 +959,13 @@ sub op_sub {
 	return 'NaN' if $n1 eq 'Infinity' && $n2 eq 'Infinity';
 	return 'NaN' if $n1 eq '-Infinity' && $n2 eq '-Infinity';
 
+	return '-0' if $n1 eq '-0' && ($n2 eq '-0' || $n2 eq '0');
+
 	return $n1 - $n2;
 }
 
 sub op_mul {
 	my ($self, $n1, $n2) = @_;
-
-#print "mul: $n1, $n2\n";
 
 	# 0*Inf is NaN
 	return 'NaN' if ($n1 eq 'Infinity' || $n1 eq '-Infinity') && ($n2 eq '-0' || $n2 eq '0');
@@ -984,7 +988,7 @@ sub is_neg {
 	return 1 if $n eq '-Infinity';
 	return 1 if $n eq '-0';
 	return 0 if $n eq 'Infinity';
-	return $n >= 0 ? 1 : 0;
+	return $n < 0 ? 1 : 0;
 }
 
 sub op_mod {
@@ -1012,6 +1016,11 @@ sub op_div {
 
 	return '-Infinity' if $n2 eq '-0';
 	return 'Infinity' if $n2 eq '0';
+
+	if ($n1 eq '-0'){
+		my $neg = $self->is_neg($n2);
+		return $neg ? '0' : '-0';
+	}
 
 	return $n1 / $n2;
 }
