@@ -19,7 +19,7 @@ sub parse {
 
 	$self->trim();
 
-	while($self->{input}){
+	while (length $self->{input}){
 		$self->step();
 		last if $self->{error};
 	}
