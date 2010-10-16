@@ -167,7 +167,7 @@ sub test_number {
 	my $ret = $xpath->query($path);
 
 	if (!$ret){
-		print "Error: $xpath->{error}\n";
+		print "Error: $xpath->{error} ($path)\n";
 		ok(0);
 		ok(0);
 		return;
@@ -179,7 +179,7 @@ sub test_number {
 		ok($ret->{value} eq $expected);
 
 		if ($ret->{value} ne $expected){
-			print "expected $expected, got $ret->{value}\n";
+			print "expected $expected, got $ret->{value} ($path)\n";
 		}
 	}else{
 		print "got a $ret->{type} result\n";
@@ -240,7 +240,7 @@ sub test_boolean {
 	my $ret = $xpath->query($path);
 
 	if (!$ret){
-		print "Error: $xpath->{error}\n";
+		print "Error: $xpath->{error} ($path)\n";
 		ok(0);
 		ok(0);
 		return;
