@@ -378,20 +378,24 @@ sub eval {
 
 		return $a1 if $a1->is_error;
 		return $a2 if $a2->is_error;
-		return $a1 if $a1->is_nan;
-		return $a2 if $a1->is_nan;
 
-		return $self->ret('number', 'NaN') if $a1->{value} eq 'Infinity';
-		return $self->ret('number', 'NaN') if $a1->{value} eq '-Infinity';
-		return $self->ret('number', 'NaN') if $a2->{value} eq 'Infinity';
-		return $self->ret('number', 'NaN') if $a1->{value} eq '-Infinity';
+		return $self->ret('number', $self->op_mod($a1->{value}, $a2->{value})) if $self->{content} eq 'mod';
+		return $self->ret('number', $self->op_div($a1->{value}, $a2->{value})) if $self->{content} eq 'div';
 
-		my $result = 0;
-		$result = $a1->{value} * $a2->{value} if $self->{content} eq '*';
-		$result = $self->op_mod($a1->{value}, $a2->{value}) if $self->{content} eq 'mod';
-		$result = $self->op_div($a1->{value}, $a2->{value}) if $self->{content} eq 'div';
+		if ($self->{content} eq '*'){
 
-		return $self->ret('number', $result);
+			return $a1 if $a1->is_nan;
+			return $a2 if $a1->is_nan;
+
+			return $self->ret('number', 'NaN') if $a1->{value} eq 'Infinity';
+			return $self->ret('number', 'NaN') if $a1->{value} eq '-Infinity';
+			return $self->ret('number', 'NaN') if $a2->{value} eq 'Infinity';
+			return $self->ret('number', 'NaN') if $a1->{value} eq '-Infinity';
+
+			return $self->ret('number', $a1->{value} * $a2->{value});
+		}
+
+		return $self->ret('Error', "Unknown MultiplicativeExpr $self->{content}");
 
 	}elsif (($self->{type} eq 'OrExpr') || ($self->{type} eq 'AndExpr')){
 
@@ -438,6 +442,10 @@ sub eval {
 	}elsif ($self->{type} eq 'PrimaryExpr'){
 
 		return $self->{tokens}->[0]->eval($context);
+
+	}elsif ($self->{type} eq 'Operator'){
+
+		return $self->ret('Error', "Unexpected Operator token.");
 
 	}else{
 		return $self->ret('Error', "Don't know how to eval a '$self->{type}' node.");
@@ -956,6 +964,8 @@ sub op_div {
 	if (($n2 eq '-0' || $n2 == 0) && ($n1 eq '-0' || $n1 == 0)){
 		return 'NaN';
 	}
+
+	return '-0' if $n1 eq '-0' && $n2 eq 'Infinity';
 
 	return '-Infinity' if $n2 eq '-0';
 	return 'Infinity' if $n2 eq '0';
